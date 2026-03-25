@@ -12,7 +12,7 @@
       </button>
     </div>
     <div class="grid grid-cols-[240px_1fr] h-[calc(100vh-36px)] bg-white overflow-hidden">
-      <aside class="bg-white px-4 py-6 h-full overflow-auto min-h-0">
+      <aside class="bg-white px-4 py-6 h-full min-h-0 flex flex-col overflow-hidden">
         <div class="mb-6 flex items-center gap-2">
           <div class="h-8 w-8 rounded-xl bg-indigo-600/10 border border-indigo-600/20"></div>
           <div>
@@ -48,24 +48,21 @@
           <span>集合</span>
           <span>{{ store.collections.length }}</span>
         </div>
-        <div class="space-y-1 mt-3 text-sm">
-          <button
-            v-for="collection in store.collections"
-            :key="collection.id"
-            class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50"
-            :class="activePage === 'cards' && store.selectedCollectionId === collection.id ? 'bg-slate-100 text-slate-800' : 'text-slate-600'"
-            @click="activePage = 'cards'; store.selectedCollectionId = collection.id"
-          >
-            <div class="flex items-center justify-between">
-              <span class="truncate">{{ collection.name }}</span>
-              <span class="text-xs text-slate-500">{{ collection.cardIds.length }}</span>
-            </div>
-          </button>
-        </div>
-        <div v-if="store.selectedCollection" class="space-y-2 pt-4 mt-4 border-t border-slate-200">
-          <button class="btn btn-primary w-full" @click="runCollection(store.selectedCollection)">运行集合</button>
-          <button class="btn w-full" @click="openCollectionModal(store.selectedCollection)">编辑集合</button>
-          <button class="btn btn-danger w-full" @click="confirmDeleteCollection(store.selectedCollection)">删除集合</button>
+        <div class="mt-3 flex-1 min-h-0 overflow-auto pr-1 scroll-fade">
+          <div class="space-y-1 text-sm">
+            <button
+              v-for="collection in store.collections"
+              :key="collection.id"
+              class="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50"
+              :class="activePage === 'cards' && store.selectedCollectionId === collection.id ? 'bg-slate-100 text-slate-800' : 'text-slate-600'"
+              @click="activePage = 'cards'; store.selectedCollectionId = collection.id"
+            >
+              <div class="flex items-center justify-between">
+                <span class="truncate">{{ collection.name }}</span>
+                <span class="text-xs text-slate-500">{{ collection.cardIds.length }}</span>
+              </div>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -73,12 +70,11 @@
         <div class="px-6 py-4 flex-1 overflow-hidden min-h-0 main-divider">
           <main v-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
             <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10">
-              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px]">
+              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px] shadow-sm search-shell">
                 <input v-model="store.searchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索命令、描述、标签" />
               </div>
             </div>
-            <p class="absolute top-3 right-0 text-xs text-slate-500">{{ store.filteredCards.length }} 张卡片</p>
-            <div class="flex-1 overflow-auto pr-1 min-h-0 scroll-fade">
+            <div class="flex-1 overflow-auto pr-1 min-h-0 scroll-fade pb-24 pt-16">
               <div class="grid grid-cols-3 gap-4">
                 <div
                   v-for="card in store.filteredCards"
@@ -106,9 +102,10 @@
                       class="icon-btn"
                       :class="selectedForCollection.includes(card.id) ? 'icon-btn-selected' : ''"
                       @click="toggleSelectForCollection(card.id)"
-                      title="加入新集合"
+                      title="选中"
                     >
-                      <FolderPlusIcon class="h-4 w-4" />
+                      <CheckCircleIcon v-if="selectedForCollection.includes(card.id)" class="h-4 w-4" />
+                      <CircleIcon v-else class="h-4 w-4" />
                     </button>
                     <button class="icon-btn" @click="openCardModal(card)" title="编辑">
                       <PencilIcon class="h-4 w-4" />
@@ -158,24 +155,36 @@
                 </div>
               </div>
             </section>
-            <div class="fab-group">
-              <button class="fab relative" @click="openCollectionModal()" title="新建集合">
+            <div class="fab-group" :key="`fab-cards-${activePage}-${store.selectedCollectionId || 'all'}-${fabAnimKey}`">
+              <button class="fab fab-bounce relative" @click="openCollectionModal()" title="新建集合">
                 <FolderPlusIcon class="h-5 w-5" />
                 <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
               </button>
-              <button class="fab fab-alt" @click="openCardModal()" title="新建卡片">
+              <button
+                class="fab fab-danger fab-bounce relative"
+                :class="selectedCount ? '' : 'opacity-40 pointer-events-none'"
+                @click="confirmDeleteSelectedCards"
+                title="批量删除卡片"
+              >
+                <TrashIcon class="h-5 w-5" />
+                <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
+              </button>
+              <button class="fab fab-alt fab-bounce" @click="openCardModal()" title="新建卡片">
                 <SquarePlusIcon class="h-5 w-5" />
               </button>
-              <button class="fab" @click="importData" title="导入 JSON">
+              <button class="fab fab-bounce" @click="importData" title="导入 JSON">
                 <ImportIcon class="h-5 w-5" />
               </button>
-              <button class="fab fab-alt" @click="exportData" title="导出 JSON">
+              <button class="fab fab-alt fab-bounce" @click="exportData" title="导出 JSON">
                 <ExportIcon class="h-5 w-5" />
+              </button>
+              <button v-if="store.selectedCollection" class="fab fab-play fab-bounce" @click="runCollection(store.selectedCollection)" title="运行集合">
+                <PlayIcon class="h-5 w-5" />
               </button>
             </div>
           </main>
           <main v-else-if="activePage === 'collections'" class="space-y-4 h-full flex flex-col min-h-0">
-            <div class="card-panel rounded-xl p-4 space-y-4 flex-1 overflow-auto min-h-0 scroll-fade scroll-top-divider">
+            <div class="rounded-xl p-4 space-y-4 flex-1 overflow-auto min-h-0 scroll-fade">
               <div class="flex items-center justify-between">
                 <div>
                   <h3 class="text-sm font-semibold text-slate-700">集合列表</h3>
@@ -188,9 +197,15 @@
                   :key="collection.id"
                   class="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2"
                 >
-                  <div>
-                    <p class="text-sm font-medium text-slate-700">{{ collection.name }}</p>
-                    <p class="text-xs text-slate-400">{{ collection.cardIds.length }} 张卡片</p>
+                  <div class="flex items-center gap-2 min-w-0">
+                    <button class="icon-btn" @click="toggleCollectionSelection(collection.id)" title="选择集合">
+                      <CheckCircleIcon v-if="selectedCollections.includes(collection.id)" class="h-4 w-4 text-indigo-600" />
+                      <CircleIcon v-else class="h-4 w-4 text-slate-400" />
+                    </button>
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-slate-700 truncate">{{ collection.name }}</p>
+                      <p class="text-xs text-slate-400">{{ collection.cardIds.length }} 张卡片</p>
+                    </div>
                   </div>
                   <div class="flex items-center gap-2">
                     <button class="icon-btn" @click="openCollectionModal(collection)" title="编辑">
@@ -209,15 +224,24 @@
                 </div>
               </div>
             </div>
-            <div class="fab-group">
-              <button class="fab relative" @click="openCollectionModal()" title="新建集合">
-                <PlusIcon class="h-5 w-5" />
+            <div class="fab-group" :key="`fab-collections-${activePage}-${fabAnimKey}`">
+              <button class="fab fab-bounce relative" @click="openCollectionModal()" title="新建集合">
+                <FolderPlusIcon class="h-5 w-5" />
                 <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
+              </button>
+              <button
+                class="fab fab-danger fab-bounce relative"
+                :class="selectedCollectionCount ? '' : 'opacity-40 pointer-events-none'"
+                @click="confirmDeleteSelectedCollections"
+                title="批量删除"
+              >
+                <TrashIcon class="h-5 w-5" />
+                <span v-if="selectedCollectionCount" class="fab-badge">{{ selectedCollectionCount }}</span>
               </button>
             </div>
           </main>
           <main v-else class="space-y-4 h-full flex flex-col min-h-0">
-            <div class="card-panel rounded-xl p-4 space-y-4 w-full flex-1 overflow-auto min-h-0 scroll-fade scroll-top-divider">
+            <div class="rounded-xl p-4 space-y-4 w-full flex-1 overflow-auto min-h-0 scroll-fade">
               <div>
                 <h3 class="text-sm font-semibold text-slate-700">终端路径</h3>
                 <p class="text-xs text-slate-400">自定义 CMD / PowerShell / Bash 的可执行路径</p>
@@ -361,7 +385,24 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import Draggable from 'vuedraggable';
-import { Play, Pencil, Copy, Trash2, ChevronDown, Settings, Check, Plus, FolderPlus, SquarePlus, Import, Upload, Minus, Square, X } from 'lucide-vue-next';
+import {
+  Play,
+  Pencil,
+  Copy,
+  Trash2,
+  ChevronDown,
+  Settings,
+  Check,
+  Plus,
+  FolderPlus,
+  Import,
+  Upload,
+  Minus,
+  Square,
+  X,
+  Circle,
+  CheckCircle2
+} from 'lucide-vue-next';
 import { useDataStore } from './modules/terminal/terminalStore';
 
 const PlayIcon = Play;
@@ -373,19 +414,23 @@ const SettingsIcon = Settings;
 const CheckIcon = Check;
 const PlusIcon = Plus;
 const FolderPlusIcon = FolderPlus;
-const SquarePlusIcon = SquarePlus;
+const SquarePlusIcon = Plus;
 const ImportIcon = Import;
 const ExportIcon = Upload;
 const MinusIcon = Minus;
 const SquareIcon = Square;
 const CloseIcon = X;
+const CircleIcon = Circle;
+const CheckCircleIcon = CheckCircle2;
 
 const store = useDataStore();
 const activePage = ref('cards');
+const fabAnimKey = ref(0);
 const logCollapsed = ref(false);
 const settingsForm = reactive({ cmd: 'cmd.exe', ps: 'powershell.exe', bash: 'bash' });
 const toast = reactive({ show: false, message: '', tone: 'info' });
 const selectedForCollection = ref([]);
+const selectedCollections = ref([]);
 
 const cardModal = reactive({
   open: false,
@@ -412,6 +457,7 @@ const confirmModal = reactive({
 
 const activeRun = computed(() => store.runLogs.find((r) => r.id === store.activeRunId));
 const selectedCount = computed(() => selectedForCollection.value.length);
+const selectedCollectionCount = computed(() => selectedCollections.value.length);
 const windowMaximized = ref(false);
 
 function formatDate(value) {
@@ -542,7 +588,10 @@ function saveCard() {
   if (cardModal.mode === 'edit') {
     store.updateCard(cardModal.cardId, payload);
   } else {
-    store.addCard(payload);
+    const newId = store.addCard(payload);
+    if (store.selectedCollectionId) {
+      store.addCardsToCollection(store.selectedCollectionId, [newId]);
+    }
   }
   cardModal.open = false;
 }
@@ -605,6 +654,53 @@ function toggleSelectForCollection(cardId) {
   }
 }
 
+function confirmDeleteSelectedCards() {
+  if (!selectedForCollection.value.length) return;
+  const targets = selectedForCollection.value.slice();
+  const names = targets.map((id) => {
+    const card = store.cards.find((c) => c.id === id);
+    return card ? card.name : '未知卡片';
+  });
+  confirmModal.title = '批量删除卡片';
+  confirmModal.message = `确认删除选中的 ${targets.length} 张卡片吗？`;
+  confirmModal.details = names.join('\n');
+  confirmModal.confirmText = '确认删除';
+  confirmModal.onConfirm = () => {
+    targets.forEach((id) => store.deleteCard(id));
+    selectedForCollection.value = [];
+    confirmModal.open = false;
+  };
+  confirmModal.open = true;
+}
+
+function toggleCollectionSelection(collectionId) {
+  const index = selectedCollections.value.indexOf(collectionId);
+  if (index >= 0) {
+    selectedCollections.value.splice(index, 1);
+  } else {
+    selectedCollections.value.push(collectionId);
+  }
+}
+
+function confirmDeleteSelectedCollections() {
+  if (!selectedCollections.value.length) return;
+  const targets = selectedCollections.value.slice();
+  const names = targets.map((id) => {
+    const collection = store.collections.find((c) => c.id === id);
+    return collection ? collection.name : '未知集合';
+  });
+  confirmModal.title = '批量删除集合';
+  confirmModal.message = `确认删除选中的 ${targets.length} 个集合吗？`;
+  confirmModal.details = names.join('\n');
+  confirmModal.confirmText = '确认删除';
+  confirmModal.onConfirm = () => {
+    targets.forEach((id) => store.deleteCollection(id));
+    selectedCollections.value = [];
+    confirmModal.open = false;
+  };
+  confirmModal.open = true;
+}
+
 function confirmDeleteCard(card) {
   confirmModal.title = '删除卡片';
   confirmModal.message = `确认删除卡片「${card.name}」吗？`;
@@ -655,10 +751,44 @@ function runCollection(collection) {
 }
 
 async function exportData() {
+  if (store.selectedCollection) {
+    const collection = store.selectedCollection;
+    const cards = collection.cardIds.map((id) => store.cards.find((c) => c.id === id)).filter(Boolean);
+    await window.terminalHelper.exportDataCustom({
+      cards: cards.map(toPlain),
+      collections: [toPlain(collection)],
+      runLogs: [],
+      settings: toPlain(store.settings)
+    });
+    return;
+  }
   await window.terminalHelper.exportData();
 }
 
 async function importData() {
+  if (store.selectedCollection) {
+    const result = await window.terminalHelper.importDataRaw();
+    if (!result || !result.ok) return;
+    const data = result.data || {};
+    const cards = Array.isArray(data.cards) ? data.cards : [];
+    if (!cards.length) {
+      showToast('导入文件没有卡片数据', 'error');
+      return;
+    }
+    const newIds = [];
+    cards.forEach((card) => {
+      const newId = store.addCard({
+        name: (card.name || '').toString(),
+        command: (card.command || '').toString(),
+        description: (card.description || '').toString(),
+        shell: card.shell || 'cmd'
+      });
+      newIds.push(newId);
+    });
+    store.addCardsToCollection(store.selectedCollectionId, newIds);
+    showToast(`已导入 ${newIds.length} 张卡片`, 'success');
+    return;
+  }
   const result = await window.terminalHelper.importData();
   if (result && result.ok) {
     await store.load();
@@ -692,6 +822,7 @@ onMounted(async () => {
       if (value === 'settings') {
         syncSettingsForm();
       }
+      fabAnimKey.value += 1;
     }
   );
   window.terminalHelper.onRunBegin((payload) => {

@@ -1,4 +1,4 @@
-﻿const { ipcMain, dialog, BrowserWindow } = require('electron');
+const { ipcMain, dialog, BrowserWindow, app } = require('electron');
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -71,25 +71,76 @@ function detectShellPaths() {
   };
 }
 
+
+
 function spawnForShell(command, shell) {
   const paths = getShellPaths();
   const normalized = (shell || 'cmd').toLowerCase();
+  const cwd = app.getPath('home') || process.env.USERPROFILE || process.env.HOME || process.cwd();
   if (process.platform === 'win32') {
     if (normalized === 'ps') {
-      return spawn(paths.ps, ['-NoProfile', '-Command', command], { windowsHide: true });
+      return spawn(paths.ps, ['-NoProfile', '-Command', command], { windowsHide: true, cwd });
     }
     if (normalized === 'bash') {
-      return spawn(paths.bash, ['-lc', command], { windowsHide: true });
+      return spawn(paths.bash, ['-lc', command], { windowsHide: true, cwd });
     }
-    return spawn(paths.cmd, ['/c', command], { windowsHide: true });
+    return spawn(paths.cmd, ['/c', command], { windowsHide: true, cwd });
   }
   if (normalized === 'ps') {
-    return spawn(paths.ps || 'pwsh', ['-NoProfile', '-Command', command]);
+    return spawn(paths.ps || 'pwsh', ['-NoProfile', '-Command', command], { cwd });
   }
   if (normalized === 'bash') {
-    return spawn(paths.bash || 'bash', ['-lc', command]);
+    return spawn(paths.bash || 'bash', ['-lc', command], { cwd });
   }
-  return spawn(command, { shell: true });
+  return spawn(command, { shell: true, cwd });
+}
+function spawnShellSession(shell) {
+  const paths = getShellPaths();
+  const normalized = (shell || 'cmd').toLowerCase();
+  const cwd = app.getPath('home') || process.env.USERPROFILE || process.env.HOME || process.cwd();
+  if (process.platform === 'win32') {
+    if (normalized === 'ps') {
+      return spawn(paths.ps, ['-NoLogo', '-NoProfile', '-Command', '-'], { windowsHide: true, cwd });
+    }
+    if (normalized === 'bash') {
+      return spawn(paths.bash, ['-s'], { windowsHide: true, cwd });
+    }
+    return spawn(paths.cmd, ['/Q', '/D'], { windowsHide: true, cwd });
+  }
+  if (normalized === 'ps') {
+    return spawn(paths.ps || 'pwsh', ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd });
+  }
+  if (normalized === 'bash') {
+    return spawn(paths.bash || 'bash', ['-s'], { cwd });
+  }
+  return spawn(process.env.SHELL || 'sh', ['-s'], { cwd });
+}
+
+function buildSessionCommand(command, shell, marker) {
+  const normalized = (shell || 'cmd').toLowerCase();
+  if (normalized === 'ps') {
+    return `& { ${command} }\nWrite-Output "${marker}$LASTEXITCODE"\n`;
+  }
+  if (normalized === 'bash') {
+    return `${command}\necho ${marker}$?\n`;
+  }
+  return `${command}\r\necho ${marker}%ERRORLEVEL%\r\n`;
+}
+
+function closeSession(child, shell) {
+  if (!child || child.killed) return;
+  const normalized = (shell || 'cmd').toLowerCase();
+  try {
+    if (normalized === 'ps') {
+      child.stdin.write('exit\n');
+    } else if (normalized === 'bash') {
+      child.stdin.write('exit\n');
+    } else {
+      child.stdin.write('exit\r\n');
+    }
+  } catch (err) {
+    // ignore
+  }
 }
 
 function runCommand(event, card, runId, stepId) {
@@ -149,6 +200,17 @@ function registerIpcHandlers() {
     return { ok: true, filePath };
   });
 
+  ipcMain.handle('data:export-custom', async (event, payload) => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Export Commands JSON',
+      defaultPath: 'terminal-helper-export.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, JSON.stringify(payload || {}, null, 2), 'utf-8');
+    return { ok: true, filePath };
+  });
+
   ipcMain.handle('data:import', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Import Commands JSON',
@@ -160,6 +222,18 @@ function registerIpcHandlers() {
     const data = JSON.parse(content);
     store.setAll(data);
     return { ok: true };
+  });
+
+  ipcMain.handle('data:import-raw', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Import Commands JSON',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (canceled || !filePaths || filePaths.length === 0) return { ok: false, canceled: true };
+    const content = fs.readFileSync(filePaths[0], 'utf-8');
+    const data = JSON.parse(content);
+    return { ok: true, data };
   });
 
   ipcMain.handle('settings:detect-shells', () => {
@@ -199,16 +273,115 @@ function registerIpcHandlers() {
     const startedAt = new Date().toISOString();
     sendToRenderer(event, 'run:begin', { runId, targetType: 'collection', targetId: collection.id, startedAt });
 
+    const shell = cards && cards.length ? cards[0].shell : 'cmd';
+    const session = spawnShellSession(shell);
     let status = 'success';
+    let currentStep = null;
+    let stdoutTail = '';
+
+    function emitStdout(chunk) {
+      if (!currentStep || !chunk) return;
+      sendToRenderer(event, 'run:log', {
+        runId,
+        stepId: currentStep.stepId,
+        stream: 'stdout',
+        chunk,
+        at: new Date().toISOString()
+      });
+    }
+
+    function emitStderr(chunk) {
+      if (!currentStep || !chunk) return;
+      sendToRenderer(event, 'run:log', {
+        runId,
+        stepId: currentStep.stepId,
+        stream: 'stderr',
+        chunk,
+        at: new Date().toISOString()
+      });
+    }
+
+    function handleStdout(text) {
+      if (!currentStep) return;
+      const marker = currentStep.marker;
+      let buffer = stdoutTail + text;
+      let markerIndex = buffer.indexOf(marker);
+      if (markerIndex === -1) {
+        if (buffer.length > marker.length) {
+          const emit = buffer.slice(0, buffer.length - marker.length);
+          emitStdout(emit);
+          stdoutTail = buffer.slice(-marker.length);
+        } else {
+          stdoutTail = buffer;
+        }
+        return;
+      }
+
+      const before = buffer.slice(0, markerIndex);
+      if (before) emitStdout(before);
+
+      const after = buffer.slice(markerIndex + marker.length);
+      const match = after.match(/^(\d+)/);
+      const exitCode = match ? Number(match[1]) : 0;
+      stdoutTail = '';
+
+      const endedAt = new Date().toISOString();
+      const stepId = currentStep.stepId;
+      const stepStatus = exitCode === 0 ? 'success' : 'failed';
+      sendToRenderer(event, 'run:step-end', { runId, stepId, exitCode, status: stepStatus, endedAt });
+      currentStep.resolve({ exitCode, status: stepStatus });
+      currentStep = null;
+    }
+
+    session.stdout.on('data', (data) => {
+      handleStdout(decodeChunk(data));
+    });
+
+    session.stderr.on('data', (data) => {
+      emitStderr(decodeChunk(data));
+    });
+
+    session.on('close', () => {
+      if (currentStep) {
+        const endedAt = new Date().toISOString();
+        sendToRenderer(event, 'run:step-end', {
+          runId,
+          stepId: currentStep.stepId,
+          exitCode: 1,
+          status: 'failed',
+          endedAt
+        });
+        currentStep.resolve({ exitCode: 1, status: 'failed' });
+        currentStep = null;
+      }
+    });
+
     for (const card of cards) {
+      if (status !== 'success') break;
       const stepId = `step_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const result = await runCommand(event, card, runId, stepId);
+      const startedAtStep = new Date().toISOString();
+      sendToRenderer(event, 'run:step-begin', {
+        runId,
+        stepId,
+        cardId: card.id,
+        command: card.command,
+        startedAt: startedAtStep
+      });
+
+      const marker = `__TH_END_${stepId}__`;
+      const commandText = buildSessionCommand(card.command, shell, marker);
+      const result = await new Promise((resolve) => {
+        currentStep = { stepId, marker, resolve };
+        stdoutTail = '';
+        session.stdin.write(commandText);
+      });
+
       if (result.exitCode !== 0) {
         status = 'failed';
-        break;
       }
     }
 
+    closeSession(session, shell);
     const endedAt = new Date().toISOString();
     sendToRenderer(event, 'run:end', { runId, status, endedAt });
     activeCollections.delete(collection.id);
@@ -243,3 +416,6 @@ function registerIpcHandlers() {
 }
 
 module.exports = { registerIpcHandlers };
+
+
+

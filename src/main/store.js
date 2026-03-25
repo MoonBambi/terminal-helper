@@ -1,4 +1,6 @@
-﻿const { default: Store } = require('electron-store');
+const { app } = require('electron');
+const fs = require('fs');
+const path = require('path');
 
 const defaults = {
   cards: [],
@@ -13,22 +15,77 @@ const defaults = {
   }
 };
 
-const store = new Store({
-  name: 'terminal-helper',
-  defaults
-});
+function resolveDataDir() {
+  return path.join(app.getPath('userData'), 'data');
+}
+
+function resolveDataFile() {
+  return path.join(resolveDataDir(), 'terminal-helper.json');
+}
+
+function resolveSampleFile() {
+  return path.join(app.getAppPath(), 'data', 'sample.json');
+}
+
+function resolveLegacyFile() {
+  return path.join(app.getAppPath(), 'data', 'terminal-helper.json');
+}
+
+function ensureDataFile() {
+  const dir = resolveDataDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const file = resolveDataFile();
+  if (!fs.existsSync(file)) {
+    let initial = defaults;
+    const legacyPath = resolveLegacyFile();
+    if (fs.existsSync(legacyPath)) {
+      try {
+        const raw = fs.readFileSync(legacyPath, 'utf-8');
+        initial = JSON.parse(raw);
+      } catch (err) {
+        initial = defaults;
+      }
+    } else {
+      const samplePath = resolveSampleFile();
+      if (fs.existsSync(samplePath)) {
+        try {
+          const raw = fs.readFileSync(samplePath, 'utf-8');
+          initial = JSON.parse(raw);
+        } catch (err) {
+          initial = defaults;
+        }
+      }
+    }
+    fs.writeFileSync(file, JSON.stringify(normalize(initial), null, 2), 'utf-8');
+  }
+}
+
+function normalize(data) {
+  return {
+    cards: Array.isArray(data?.cards) ? data.cards : [],
+    collections: Array.isArray(data?.collections) ? data.collections : [],
+    runLogs: Array.isArray(data?.runLogs) ? data.runLogs : [],
+    settings: data?.settings || defaults.settings
+  };
+}
 
 function getAll() {
-  return store.store;
+  ensureDataFile();
+  try {
+    const raw = fs.readFileSync(resolveDataFile(), 'utf-8');
+    const data = JSON.parse(raw);
+    return normalize(data);
+  } catch (err) {
+    return normalize(defaults);
+  }
 }
 
 function setAll(data) {
-  store.set({
-    cards: Array.isArray(data.cards) ? data.cards : [],
-    collections: Array.isArray(data.collections) ? data.collections : [],
-    runLogs: Array.isArray(data.runLogs) ? data.runLogs : [],
-    settings: data.settings || defaults.settings
-  });
+  ensureDataFile();
+  const normalized = normalize(data);
+  fs.writeFileSync(resolveDataFile(), JSON.stringify(normalized, null, 2), 'utf-8');
 }
 
 module.exports = { getAll, setAll };

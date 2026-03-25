@@ -70,16 +70,19 @@ export const useDataStore = defineStore('data', {
       this.runLogs = Array.isArray(data.runLogs) ? data.runLogs : [];
     },
     async persist() {
-      await window.terminalHelper.saveData({
-        cards: this.cards,
-        collections: this.collections,
-        runLogs: this.runLogs,
-        settings: this.settings
-      });
+      const payload = JSON.parse(
+        JSON.stringify({
+          cards: this.cards,
+          collections: this.collections,
+          runLogs: this.runLogs,
+          settings: this.settings
+        })
+      );
+      await window.terminalHelper.saveData(payload);
     },
     addCard(payload) {
       const now = new Date().toISOString();
-      this.cards.unshift({
+      const card = {
         id: makeId('card'),
         name: payload.name,
         command: payload.command,
@@ -87,8 +90,10 @@ export const useDataStore = defineStore('data', {
         shell: payload.shell || 'cmd',
         createdAt: now,
         updatedAt: now
-      });
+      };
+      this.cards.unshift(card);
       this.persist();
+      return card.id;
     },
     updateCard(id, payload) {
       const card = this.cards.find((c) => c.id === id);
@@ -128,6 +133,19 @@ export const useDataStore = defineStore('data', {
         createdAt: now,
         updatedAt: now
       });
+      this.persist();
+    },
+    addCardsToCollection(collectionId, cardIds) {
+      const collection = this.collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      const nextIds = Array.isArray(cardIds) ? cardIds : [];
+      const exists = new Set(collection.cardIds);
+      nextIds.forEach((id) => {
+        if (!exists.has(id)) {
+          collection.cardIds.push(id);
+        }
+      });
+      collection.updatedAt = new Date().toISOString();
       this.persist();
     },
     updateCollection(id, payload) {

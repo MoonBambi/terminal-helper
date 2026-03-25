@@ -1,0 +1,48 @@
+{
+  "cards": [
+    {
+      "id": "card_sample_cmd",
+      "name": "查看IP配置",
+      "command": "ipconfig",
+      "description": "查看本机网络配置",
+      "shell": "cmd",
+      "createdAt": "2026-03-25T09:30:00.000Z",
+      "updatedAt": "2026-03-25T09:30:00.000Z"
+    },
+    {
+      "id": "card_sample_ps",
+      "name": "列出服务",
+      "command": "Get-Service",
+      "description": "查看系统服务列表",
+      "shell": "ps",
+      "createdAt": "2026-03-25T09:30:00.000Z",
+      "updatedAt": "2026-03-25T09:30:00.000Z"
+    },
+    {
+      "id": "card_sample_bash",
+      "name": "列出目录",
+      "command": "ls -la",
+      "description": "列出当前目录文件",
+      "shell": "bash",
+      "createdAt": "2026-03-25T09:30:00.000Z",
+      "updatedAt": "2026-03-25T09:30:00.000Z"
+    }
+  ],
+  "collections": [
+    {
+      "id": "collection_sample_basic",
+      "name": "基础检查",
+      "cardIds": ["card_sample_cmd", "card_sample_ps"],
+      "createdAt": "2026-03-25T09:30:00.000Z",
+      "updatedAt": "2026-03-25T09:30:00.000Z"
+    }
+  ],
+  "runLogs": [],
+  "settings": {
+    "shellPaths": {
+      "cmd": "cmd.exe",
+      "ps": "powershell.exe",
+      "bash": "bash"
+    }
+  }
+}
