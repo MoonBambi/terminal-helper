@@ -207,3 +207,32 @@ textarea.input {
 .scroll-top-divider {
   border-top: 1px solid #e2e8f0;
 }
+
+.main-divider {
+  position: relative;
+  --corner-radius: 24px;
+}
+
+.main-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--corner-radius);
+  border-top: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
+  border-top-left-radius: var(--corner-radius);
+  pointer-events: none;
+}
+
+.main-divider::after {
+  content: "";
+  position: absolute;
+  top: var(--corner-radius);
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e2e8f0;
+  pointer-events: none;
+}

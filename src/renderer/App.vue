@@ -12,7 +12,7 @@
       </button>
     </div>
     <div class="grid grid-cols-[240px_1fr] h-[calc(100vh-36px)] bg-white overflow-hidden">
-      <aside class="bg-white border-r border-slate-200 px-4 py-6 h-full overflow-auto min-h-0">
+      <aside class="bg-white px-4 py-6 h-full overflow-auto min-h-0">
         <div class="mb-6 flex items-center gap-2">
           <div class="h-8 w-8 rounded-xl bg-indigo-600/10 border border-indigo-600/20"></div>
           <div>
@@ -70,7 +70,7 @@
       </aside>
 
       <div class="flex flex-col h-full min-h-0">
-        <div class="px-6 py-4 flex-1 overflow-hidden min-h-0 border-t border-slate-200">
+        <div class="px-6 py-4 flex-1 overflow-hidden min-h-0 main-divider">
           <main v-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
             <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10">
               <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px]">
