@@ -107,14 +107,16 @@ export const useDataStore = defineStore('data', {
     },
     duplicateCard(card) {
       const now = new Date().toISOString();
-      this.cards.unshift({
+      const next = {
         ...card,
         id: makeId('card'),
         name: `${card.name} Copy`,
         createdAt: now,
         updatedAt: now
-      });
+      };
+      this.cards.unshift(next);
       this.persist();
+      return next.id;
     },
     deleteCard(id) {
       this.cards = this.cards.filter((c) => c.id !== id);
@@ -173,6 +175,43 @@ export const useDataStore = defineStore('data', {
       if (this.selectedCollectionId === id) {
         this.selectedCollectionId = null;
       }
+      this.persist();
+    },
+    insertCardIntoCollection(collectionId, cardId, index) {
+      const collection = this.collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      const nextIndex = Number.isInteger(index) ? index : collection.cardIds.length;
+      const boundedIndex = Math.max(0, Math.min(nextIndex, collection.cardIds.length));
+      collection.cardIds.splice(boundedIndex, 0, cardId);
+      collection.updatedAt = new Date().toISOString();
+      this.persist();
+    },
+    removeCardFromCollection(collectionId, cardId) {
+      const collection = this.collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      const index = collection.cardIds.indexOf(cardId);
+      if (index === -1) return;
+      collection.cardIds.splice(index, 1);
+      collection.updatedAt = new Date().toISOString();
+      this.persist();
+    },
+    removeCardFromCollectionAt(collectionId, index) {
+      const collection = this.collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      if (index < 0 || index >= collection.cardIds.length) return;
+      collection.cardIds.splice(index, 1);
+      collection.updatedAt = new Date().toISOString();
+      this.persist();
+    },
+    reorderCollectionCardAt(collectionId, index, newIndex) {
+      const collection = this.collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      if (index < 0 || index >= collection.cardIds.length) return;
+      const boundedIndex = Math.max(0, Math.min(newIndex, collection.cardIds.length - 1));
+      if (index === boundedIndex) return;
+      const [cardId] = collection.cardIds.splice(index, 1);
+      collection.cardIds.splice(boundedIndex, 0, cardId);
+      collection.updatedAt = new Date().toISOString();
       this.persist();
     },
     reorderCollectionCard(collectionId, cardId, newIndex) {

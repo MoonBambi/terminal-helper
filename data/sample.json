@@ -1,4 +1,4 @@
-{
+﻿{
   "cards": [
     {
       "id": "card_sample_cmd",
@@ -40,8 +40,8 @@
   "runLogs": [],
   "settings": {
     "shellPaths": {
-      "cmd": "cmd.exe",
-      "ps": "powershell.exe",
+      "cmd": "C:\\Windows\\System32\\cmd.exe",
+      "ps": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
       "bash": "bash"
     }
   }

@@ -77,62 +77,62 @@
             <div class="flex-1 overflow-auto pr-1 min-h-0 scroll-fade pb-24 pt-16">
               <div class="grid grid-cols-3 gap-4">
                 <div
-                  v-for="card in store.filteredCards"
-                  :key="card.id"
+                  v-for="entry in displayCards"
+                  :key="`${entry.card.id}-${entry.index}`"
                   class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start relative"
-                  :class="card.shell === 'ps' ? 'card-shell-ps' : card.shell === 'bash' ? 'card-shell-bash' : 'card-shell-cmd'"
+                  :class="entry.card.shell === 'ps' ? 'card-shell-ps' : entry.card.shell === 'bash' ? 'card-shell-bash' : 'card-shell-cmd'"
                 >
                   <div v-if="store.selectedCollectionId" class="order-badge">
                     <button
-                      v-if="editingOrderId !== card.id"
+                      v-if="editingOrderId !== entry.index"
                       class="order-badge-btn"
-                      @click.stop="editCollectionOrder(card.id)"
+                      @click.stop="editCollectionOrder(entry.index)"
                       title="运行顺序"
                     >
-                      {{ collectionOrderMap[card.id] || '-' }}
+                      {{ entry.index + 1 }}
                     </button>
                     <input
                       v-else
-                      :ref="(el) => setOrderInputRef(card.id, el)"
+                      :ref="(el) => setOrderInputRef(entry.index, el)"
                       v-model="orderInputValue"
                       class="order-badge-input"
-                      @keyup.enter.stop="commitCollectionOrder(card.id)"
+                      @keyup.enter.stop="commitCollectionOrder(entry.index)"
                       @keyup.esc.stop="cancelCollectionOrder"
-                      @blur="commitCollectionOrder(card.id)"
+                      @blur="commitCollectionOrder(entry.index)"
                     />
                   </div>
                   <div class="flex items-start justify-between">
                     <div>
-                      <h3 class="text-lg font-semibold truncate max-w-[16ch]">{{ card.name }}</h3>
-                      <p class="text-xs text-slate-500 truncate">{{ card.description || '暂无描述' }}</p>
+                      <h3 class="text-lg font-semibold truncate max-w-[16ch]">{{ entry.card.name }}</h3>
+                      <p class="text-xs text-slate-500 truncate">{{ entry.card.description || '暂无描述' }}</p>
                     </div>
                   </div>
                   <div class="text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 command-ellipsis">
-                    {{ card.command }}
+                    {{ entry.card.command }}
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="card-chip uppercase">{{ card.shell || 'cmd' }}</span>
+                    <span class="card-chip uppercase">{{ entry.card.shell || 'cmd' }}</span>
                   </div>
                   <div class="mt-auto flex items-center justify-center gap-3">
-                    <button class="icon-btn icon-btn-primary" @click="confirmRunCard(card)" title="执行">
+                    <button class="icon-btn icon-btn-primary" @click="confirmRunCard(entry.card)" title="执行">
                       <PlayIcon class="h-4 w-4" />
                     </button>
                     <button
                       class="icon-btn"
-                      :class="selectedForCollection.includes(card.id) ? 'icon-btn-selected' : ''"
-                      @click="toggleSelectForCollection(card.id)"
+                      :class="isCardSelected(entry.card.id, entry.index) ? 'icon-btn-selected' : ''"
+                      @click="toggleSelectForCollection(entry.card.id, entry.index)"
                       title="选中"
                     >
-                      <CheckCircleIcon v-if="selectedForCollection.includes(card.id)" class="h-4 w-4" />
+                      <CheckCircleIcon v-if="isCardSelected(entry.card.id, entry.index)" class="h-4 w-4" />
                       <CircleIcon v-else class="h-4 w-4" />
                     </button>
-                    <button class="icon-btn" @click="openCardModal(card)" title="编辑">
+                    <button class="icon-btn" @click="openCardModal(entry.card)" title="编辑">
                       <PencilIcon class="h-4 w-4" />
                     </button>
-                    <button class="icon-btn" @click="store.duplicateCard(card)" title="复制">
+                    <button class="icon-btn" @click="handleDuplicateCard(entry.card, entry.index)" title="复制">
                       <CopyIcon class="h-4 w-4" />
                     </button>
-                    <button class="icon-btn icon-btn-danger" @click="confirmDeleteCard(card)" title="删除">
+                    <button class="icon-btn icon-btn-danger" @click="confirmDeleteCard(entry.card, entry.index)" title="删除">
                       <TrashIcon class="h-4 w-4" />
                     </button>
                   </div>
@@ -512,14 +512,7 @@ const confirmModal = reactive({
 const activeRun = computed(() => store.runLogs.find((r) => r.id === store.activeRunId));
 const selectedCount = computed(() => selectedForCollection.value.length);
 const selectedCollectionCount = computed(() => selectedCollections.value.length);
-const collectionOrderMap = computed(() => {
-  const collection = store.selectedCollection;
-  if (!collection) return {};
-  return collection.cardIds.reduce((acc, id, index) => {
-    acc[id] = index + 1;
-    return acc;
-  }, {});
-});
+const isCollectionView = computed(() => Boolean(store.selectedCollectionId));
 const filteredCollectionCards = computed(() => {
   const query = collectionModal.search.trim().toLowerCase();
   if (!query) return store.cards;
@@ -530,6 +523,28 @@ const filteredCollectionCards = computed(() => {
       card.command.toLowerCase().includes(query)
     );
   });
+});
+const displayCards = computed(() => {
+  if (!store.selectedCollectionId) {
+    return store.filteredCards.map((card, index) => ({ card, index }));
+  }
+  const collection = store.selectedCollection;
+  if (!collection) return [];
+  const map = new Map(store.cards.map((card) => [card.id, card]));
+  let entries = collection.cardIds
+    .map((id, index) => ({ card: map.get(id), index }))
+    .filter((entry) => entry.card);
+  if (store.searchQuery.trim()) {
+    const q = store.searchQuery.trim().toLowerCase();
+    entries = entries.filter(({ card }) => {
+      return (
+        card.name.toLowerCase().includes(q) ||
+        card.description.toLowerCase().includes(q) ||
+        card.command.toLowerCase().includes(q)
+      );
+    });
+  }
+  return entries;
 });
 const windowMaximized = ref(false);
 
@@ -714,25 +729,52 @@ function addCardToCollectionDraft(cardId) {
   collectionModal.form.cardIds.push(cardId);
 }
 
-function hideHoverPreview() {
-  clearTimeout(hoverHideTimer);
-}
 function removeSelectedCard(index) {
   collectionModal.form.cardIds.splice(index, 1);
 }
 
-function toggleSelectForCollection(cardId) {
-  const index = selectedForCollection.value.indexOf(cardId);
-  if (index >= 0) {
-    selectedForCollection.value.splice(index, 1);
+function selectionKey(cardId, index) {
+  return isCollectionView.value ? `i:${index}` : `c:${cardId}`;
+}
+
+function isCardSelected(cardId, index) {
+  return selectedForCollection.value.includes(selectionKey(cardId, index));
+}
+
+function toggleSelectForCollection(cardId, index) {
+  const key = selectionKey(cardId, index);
+  const idx = selectedForCollection.value.indexOf(key);
+  if (idx >= 0) {
+    selectedForCollection.value.splice(idx, 1);
   } else {
-    selectedForCollection.value.push(cardId);
+    selectedForCollection.value.push(key);
   }
 }
 
 function confirmDeleteSelectedCards() {
   if (!selectedForCollection.value.length) return;
-  const targets = selectedForCollection.value.slice();
+  if (store.selectedCollectionId) {
+    const indices = selectedForCollection.value
+      .filter((k) => k.startsWith('i:'))
+      .map((k) => Number.parseInt(k.slice(2), 10))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => b - a);
+    const names = indices.map((idx) => cardName(store.selectedCollection.cardIds[idx]));
+    confirmModal.title = '移出集合';
+    confirmModal.message = `确认从当前集合移出选中的 ${indices.length} 张卡片吗？`;
+    confirmModal.details = names.join('\n');
+    confirmModal.confirmText = '确认移出';
+    confirmModal.onConfirm = () => {
+      indices.forEach((idx) => store.removeCardFromCollectionAt(store.selectedCollectionId, idx));
+      selectedForCollection.value = [];
+      confirmModal.open = false;
+    };
+    confirmModal.open = true;
+    return;
+  }
+  const targets = selectedForCollection.value
+    .filter((k) => k.startsWith('c:'))
+    .map((k) => k.slice(2));
   const names = targets.map((id) => {
     const card = store.cards.find((c) => c.id === id);
     return card ? card.name : '未知卡片';
@@ -749,14 +791,14 @@ function confirmDeleteSelectedCards() {
   confirmModal.open = true;
 }
 
-function editCollectionOrder(cardId) {
+function editCollectionOrder(index) {
   const collection = store.selectedCollection;
   if (!collection) return;
-  const current = collectionOrderMap.value[cardId] || 1;
-  editingOrderId.value = cardId;
+  const current = index + 1;
+  editingOrderId.value = index;
   orderInputValue.value = String(current);
   nextTick(() => {
-    const el = orderInputRefs.get(cardId);
+    const el = orderInputRefs.get(index);
     if (el) {
       el.focus();
       el.select();
@@ -764,7 +806,7 @@ function editCollectionOrder(cardId) {
   });
 }
 
-function commitCollectionOrder(cardId) {
+function commitCollectionOrder(index) {
   const collection = store.selectedCollection;
   if (!collection) return;
   const total = collection.cardIds.length;
@@ -773,7 +815,7 @@ function commitCollectionOrder(cardId) {
     showToast('请输入有效序号', 'error');
     return;
   }
-  store.reorderCollectionCard(collection.id, cardId, next - 1);
+  store.reorderCollectionCardAt(collection.id, index, next - 1);
   editingOrderId.value = null;
 }
 
@@ -781,11 +823,11 @@ function cancelCollectionOrder() {
   editingOrderId.value = null;
 }
 
-function setOrderInputRef(cardId, el) {
+function setOrderInputRef(index, el) {
   if (!el) {
-    orderInputRefs.delete(cardId);
+    orderInputRefs.delete(index);
   } else {
-    orderInputRefs.set(cardId, el);
+    orderInputRefs.set(index, el);
   }
 }
 function toggleCollectionSelection(collectionId) {
@@ -816,7 +858,24 @@ function confirmDeleteSelectedCollections() {
   confirmModal.open = true;
 }
 
-function confirmDeleteCard(card) {
+function confirmDeleteCard(card, index) {
+  const collectionId = store.selectedCollectionId;
+  if (collectionId) {
+    confirmModal.title = '移出集合';
+    confirmModal.message = `确认从当前集合移出卡片「${card.name}」吗？`;
+    confirmModal.details = card.command;
+    confirmModal.confirmText = '确认移出';
+    confirmModal.onConfirm = () => {
+      if (Number.isInteger(index)) {
+        store.removeCardFromCollectionAt(collectionId, index);
+      } else {
+        store.removeCardFromCollection(collectionId, card.id);
+      }
+      confirmModal.open = false;
+    };
+    confirmModal.open = true;
+    return;
+  }
   confirmModal.title = '删除卡片';
   confirmModal.message = `确认删除卡片「${card.name}」吗？`;
   confirmModal.details = card.command;
@@ -878,6 +937,16 @@ async function exportData() {
     return;
   }
   await window.terminalHelper.exportData();
+}
+
+function handleDuplicateCard(card, index) {
+  const collectionId = store.selectedCollectionId;
+  const newId = store.duplicateCard(card);
+  if (!collectionId) return;
+  const collection = store.collections.find((c) => c.id === collectionId);
+  if (!collection) return;
+  const insertIndex = Number.isInteger(index) ? index + 1 : collection.cardIds.length;
+  store.insertCardIntoCollection(collectionId, newId, insertIndex);
 }
 
 async function importData() {
@@ -989,3 +1058,5 @@ onMounted(async () => {
   });
 });
 </script>
+
+
