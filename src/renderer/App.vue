@@ -79,16 +79,35 @@
                 <div
                   v-for="card in store.filteredCards"
                   :key="card.id"
-                  class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start"
+                  class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start relative"
                   :class="card.shell === 'ps' ? 'card-shell-ps' : card.shell === 'bash' ? 'card-shell-bash' : 'card-shell-cmd'"
                 >
+                  <div v-if="store.selectedCollectionId" class="order-badge">
+                    <button
+                      v-if="editingOrderId !== card.id"
+                      class="order-badge-btn"
+                      @click.stop="editCollectionOrder(card.id)"
+                      title="运行顺序"
+                    >
+                      {{ collectionOrderMap[card.id] || '-' }}
+                    </button>
+                    <input
+                      v-else
+                      :ref="(el) => setOrderInputRef(card.id, el)"
+                      v-model="orderInputValue"
+                      class="order-badge-input"
+                      @keyup.enter.stop="commitCollectionOrder(card.id)"
+                      @keyup.esc.stop="cancelCollectionOrder"
+                      @blur="commitCollectionOrder(card.id)"
+                    />
+                  </div>
                   <div class="flex items-start justify-between">
                     <div>
                       <h3 class="text-lg font-semibold truncate max-w-[16ch]">{{ card.name }}</h3>
                       <p class="text-xs text-slate-500 truncate">{{ card.description || '暂无描述' }}</p>
                     </div>
                   </div>
-                  <div class="text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md p-2 max-h-[64px] overflow-auto">
+                  <div class="text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 command-ellipsis">
                     {{ card.command }}
                   </div>
                   <div class="flex items-center gap-2">
@@ -282,10 +301,16 @@
       </div>
     </div>
 
-    <div v-if="cardModal.open" class="fixed inset-0 bg-black/30 flex items-center justify-center">
-      <div class="card-panel rounded-xl p-6 w-[520px] space-y-4">
-        <h3 class="text-lg font-semibold">{{ cardModal.mode === 'edit' ? '编辑卡片' : '新建卡片' }}</h3>
-        <div class="space-y-3">
+    <div v-if="cardModal.open" class="fixed inset-0 z-[60]">
+      <div class="absolute inset-0 bg-black/30" @click="cardModal.open = false"></div>
+      <aside class="drawer-panel">
+        <div class="drawer-header">
+          <h3 class="text-lg font-semibold">{{ cardModal.mode === 'edit' ? '编辑卡片' : '新建卡片' }}</h3>
+          <button class="icon-btn" @click="cardModal.open = false" title="关闭">
+            <CloseIcon class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="drawer-body space-y-4 drawer-body-fill">
           <input v-model="cardModal.form.name" class="input" placeholder="卡片名称" />
           <textarea v-model="cardModal.form.command" class="input" placeholder="终端命令"></textarea>
           <textarea v-model="cardModal.form.description" class="input" placeholder="描述"></textarea>
@@ -319,46 +344,72 @@
             </div>
           </div>
         </div>
-        <div class="flex justify-end gap-2">
+        <div class="drawer-footer">
           <button class="btn" @click="cardModal.open = false">取消</button>
           <button class="btn btn-primary" @click="saveCard">保存</button>
         </div>
-      </div>
+      </aside>
     </div>
 
-    <div v-if="collectionModal.open" class="fixed inset-0 bg-black/30 flex items-center justify-center">
-      <div class="card-panel rounded-xl p-6 w-[640px] space-y-4">
-        <h3 class="text-lg font-semibold">{{ collectionModal.mode === 'edit' ? '编辑集合' : '新建集合' }}</h3>
-        <input v-model="collectionModal.form.name" class="input" placeholder="集合名称" />
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <p class="text-xs text-slate-500">已选卡片 (拖拽排序)</p>
-            <Draggable v-model="collectionModal.form.cardIds" item-key="id" class="space-y-2">
-              <template #item="{ element }">
-                <div class="border border-slate-200 rounded-md px-3 py-2 text-sm bg-slate-50">
-                  {{ cardName(element) }}
-                </div>
-              </template>
-            </Draggable>
+    <div v-if="collectionModal.open" class="fixed inset-0 z-[60]">
+      <div class="absolute inset-0 bg-black/30" @click="collectionModal.open = false"></div>
+      <aside class="drawer-panel drawer-wide">
+        <div class="drawer-header">
+          <h3 class="text-lg font-semibold">{{ collectionModal.mode === 'edit' ? '编辑集合' : '新建集合' }}</h3>
+          <button class="icon-btn" @click="collectionModal.open = false" title="关闭">
+            <CloseIcon class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="drawer-body space-y-4">
+          <input v-model="collectionModal.form.name" class="input" placeholder="集合名称" />
+          <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
+            <input v-model="collectionModal.search" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none drawer-search-input" placeholder="搜索卡片" />
           </div>
-          <div class="space-y-2">
-            <p class="text-xs text-slate-500">所有卡片</p>
-            <div class="space-y-2 max-h-[260px] overflow-auto">
-              <label v-for="card in store.cards" :key="card.id" class="flex items-center gap-2 text-sm">
-                <input type="checkbox" :checked="collectionModal.form.cardIds.includes(card.id)" @change="toggleCard(card.id)" />
-                <span>{{ card.name }}</span>
-              </label>
+          <div class="collection-split">
+            <div class="collection-split-section">
+              <p class="text-xs text-slate-500">所有卡片</p>
+              <div class="collection-list-panel collection-fill">
+                <div class="collection-list-inner space-y-2">
+                <button
+                  v-for="card in filteredCollectionCards"
+                  :key="card.id"
+                  type="button"
+                  class="collection-add-item"
+                  @click="addCardToCollectionDraft(card.id)"
+                  
+                >
+                  <span class="hover-reveal-text" :title="card.name">{{ card.name }}</span>
+                </button>
+                </div>
+              </div>
+            </div>
+            <div class="collection-split-section">
+              <p class="text-xs text-slate-500">已选卡片</p>
+              <div class="collection-list-panel collection-fill">
+                <div class="collection-list-inner space-y-2">
+                  <div
+                    v-for="(cardId, index) in collectionModal.form.cardIds"
+                    :key="`${cardId}-${index}`"
+                    class="selected-row"
+                  >
+                    <span class="hover-reveal-text" :title="cardName(cardId)">{{ cardName(cardId) }}</span>
+                    <button class="selected-remove" @click.stop="removeSelectedCard(index)" title="移除">
+                      <CloseIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="flex justify-end gap-2">
+        <div class="drawer-footer">
           <button class="btn" @click="collectionModal.open = false">取消</button>
           <button class="btn btn-primary" @click="saveCollection">保存</button>
         </div>
-      </div>
+      </aside>
     </div>
 
-    <div v-if="confirmModal.open" class="fixed inset-0 bg-black/30 flex items-center justify-center">
+    <div v-if="confirmModal.open" class="fixed inset-0 bg-black/30 flex items-center justify-center z-[60]">
       <div class="card-panel rounded-xl p-6 w-[520px] space-y-4">
         <h3 class="text-lg font-semibold">{{ confirmModal.title }}</h3>
         <p class="text-sm text-slate-600">{{ confirmModal.message }}</p>
@@ -383,8 +434,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
-import Draggable from 'vuedraggable';
+import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue';
 import {
   Play,
   Pencil,
@@ -431,6 +481,9 @@ const settingsForm = reactive({ cmd: 'cmd.exe', ps: 'powershell.exe', bash: 'bas
 const toast = reactive({ show: false, message: '', tone: 'info' });
 const selectedForCollection = ref([]);
 const selectedCollections = ref([]);
+const editingOrderId = ref(null);
+const orderInputValue = ref('');
+const orderInputRefs = new Map();
 
 const cardModal = reactive({
   open: false,
@@ -443,7 +496,8 @@ const collectionModal = reactive({
   open: false,
   mode: 'create',
   collectionId: null,
-  form: { name: '', cardIds: [] }
+  form: { name: '', cardIds: [] },
+  search: ''
 });
 
 const confirmModal = reactive({
@@ -458,6 +512,25 @@ const confirmModal = reactive({
 const activeRun = computed(() => store.runLogs.find((r) => r.id === store.activeRunId));
 const selectedCount = computed(() => selectedForCollection.value.length);
 const selectedCollectionCount = computed(() => selectedCollections.value.length);
+const collectionOrderMap = computed(() => {
+  const collection = store.selectedCollection;
+  if (!collection) return {};
+  return collection.cardIds.reduce((acc, id, index) => {
+    acc[id] = index + 1;
+    return acc;
+  }, {});
+});
+const filteredCollectionCards = computed(() => {
+  const query = collectionModal.search.trim().toLowerCase();
+  if (!query) return store.cards;
+  return store.cards.filter((card) => {
+    return (
+      card.name.toLowerCase().includes(query) ||
+      card.description.toLowerCase().includes(query) ||
+      card.command.toLowerCase().includes(query)
+    );
+  });
+});
 const windowMaximized = ref(false);
 
 function formatDate(value) {
@@ -609,6 +682,7 @@ function openCollectionModal(collection) {
     collectionModal.collectionId = null;
     collectionModal.form = { name: '', cardIds: [...selectedForCollection.value] };
   }
+  collectionModal.search = '';
   collectionModal.open = true;
 }
 
@@ -636,13 +710,15 @@ function cardName(cardId) {
   return card ? card.name : '未知卡片';
 }
 
-function toggleCard(cardId) {
-  const index = collectionModal.form.cardIds.indexOf(cardId);
-  if (index >= 0) {
-    collectionModal.form.cardIds.splice(index, 1);
-  } else {
-    collectionModal.form.cardIds.push(cardId);
-  }
+function addCardToCollectionDraft(cardId) {
+  collectionModal.form.cardIds.push(cardId);
+}
+
+function hideHoverPreview() {
+  clearTimeout(hoverHideTimer);
+}
+function removeSelectedCard(index) {
+  collectionModal.form.cardIds.splice(index, 1);
 }
 
 function toggleSelectForCollection(cardId) {
@@ -673,6 +749,45 @@ function confirmDeleteSelectedCards() {
   confirmModal.open = true;
 }
 
+function editCollectionOrder(cardId) {
+  const collection = store.selectedCollection;
+  if (!collection) return;
+  const current = collectionOrderMap.value[cardId] || 1;
+  editingOrderId.value = cardId;
+  orderInputValue.value = String(current);
+  nextTick(() => {
+    const el = orderInputRefs.get(cardId);
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  });
+}
+
+function commitCollectionOrder(cardId) {
+  const collection = store.selectedCollection;
+  if (!collection) return;
+  const total = collection.cardIds.length;
+  const next = Number.parseInt(orderInputValue.value, 10);
+  if (!Number.isFinite(next) || next < 1 || next > total) {
+    showToast('请输入有效序号', 'error');
+    return;
+  }
+  store.reorderCollectionCard(collection.id, cardId, next - 1);
+  editingOrderId.value = null;
+}
+
+function cancelCollectionOrder() {
+  editingOrderId.value = null;
+}
+
+function setOrderInputRef(cardId, el) {
+  if (!el) {
+    orderInputRefs.delete(cardId);
+  } else {
+    orderInputRefs.set(cardId, el);
+  }
+}
 function toggleCollectionSelection(collectionId) {
   const index = selectedCollections.value.indexOf(collectionId);
   if (index >= 0) {

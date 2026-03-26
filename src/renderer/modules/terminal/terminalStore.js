@@ -175,6 +175,18 @@ export const useDataStore = defineStore('data', {
       }
       this.persist();
     },
+    reorderCollectionCard(collectionId, cardId, newIndex) {
+      const collection = this.collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      const currentIndex = collection.cardIds.indexOf(cardId);
+      if (currentIndex === -1) return;
+      const boundedIndex = Math.max(0, Math.min(newIndex, collection.cardIds.length - 1));
+      if (currentIndex === boundedIndex) return;
+      collection.cardIds.splice(currentIndex, 1);
+      collection.cardIds.splice(boundedIndex, 0, cardId);
+      collection.updatedAt = new Date().toISOString();
+      this.persist();
+    },
     addRunLog(run) {
       this.runLogs.unshift(run);
       this.activeRunId = run.id;
