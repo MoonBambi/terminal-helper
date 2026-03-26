@@ -223,8 +223,13 @@
               </div>
             </section>
             <div class="fab-group" :key="`fab-cards-${activePage}-${store.selectedCollectionId || 'all'}-${fabAnimKey}`">
-              <button class="fab fab-bounce relative" @click="openCollectionModal()" title="新建集合">
-                <FolderPlusIcon class="h-5 w-5" />
+              <button
+                class="fab fab-bounce relative"
+                @click="openCollectionModal(store.selectedCollection || undefined)"
+                :title="store.selectedCollection ? '编辑集合' : '新建集合'"
+              >
+                <PencilIcon v-if="store.selectedCollection" class="h-5 w-5" />
+                <FolderPlusIcon v-else class="h-5 w-5" />
                 <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
               </button>
               <button
@@ -264,16 +269,19 @@
             </div>
           </main>
           <main v-else-if="activePage === 'collections'" class="space-y-4 h-full flex flex-col min-h-0">
-            <div class="rounded-xl p-4 space-y-4 flex-1 overflow-auto min-h-0 scroll-fade">
+            <div class="rounded-xl p-4 space-y-4 flex-1 overflow-hidden min-h-0 flex flex-col">
               <div class="flex items-center justify-between">
                 <div>
                   <h3 class="text-sm font-semibold text-slate-700">集合列表</h3>
                   <p class="text-xs text-slate-400">管理集合与卡片排序</p>
                 </div>
               </div>
-              <div class="space-y-2">
+              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
+                <input v-model="collectionSearchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索集合名称" />
+              </div>
+              <div class="space-y-2 overflow-auto pr-1 min-h-0 flex-1 scroll-fade pt-2 pb-24">
                 <div
-                  v-for="collection in store.collections"
+                  v-for="collection in filteredCollections"
                   :key="collection.id"
                   class="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2"
                 >
@@ -299,7 +307,7 @@
                     </button>
                   </div>
                 </div>
-                <div v-if="store.collections.length === 0" class="text-sm text-slate-400 py-6 text-center">
+                <div v-if="filteredCollections.length === 0" class="text-sm text-slate-400 py-6 text-center">
                   还没有集合，点击“新建集合”开始。
                 </div>
               </div>
@@ -317,6 +325,12 @@
               >
                 <TrashIcon class="h-5 w-5" />
                 <span v-if="selectedCollectionCount" class="fab-badge">{{ selectedCollectionCount }}</span>
+              </button>
+              <button class="fab fab-bounce" @click="importData" title="导入 JSON">
+                <ImportIcon class="h-5 w-5" />
+              </button>
+              <button class="fab fab-alt fab-bounce" @click="exportData" title="导出 JSON">
+                <ExportIcon class="h-5 w-5" />
               </button>
             </div>
           </main>
@@ -582,6 +596,7 @@ const selectedCollections = ref([]);
 const editingOrderId = ref(null);
 const orderInputValue = ref('');
 const orderInputRefs = new Map();
+const collectionSearchQuery = ref('');
 
 const cardModal = reactive({
   open: false,
@@ -617,6 +632,11 @@ const selectedCount = computed(() => selectedForCollection.value.length);
 const selectedCollectionCount = computed(() => selectedCollections.value.length);
 const isCollectionView = computed(() => Boolean(store.selectedCollectionId));
 const collectionStopAction = computed(() => normalizeStopAction(store.selectedCollection?.stopAction));
+const filteredCollections = computed(() => {
+  const query = collectionSearchQuery.value.trim().toLowerCase();
+  if (!query) return store.collections;
+  return store.collections.filter((collection) => collection.name.toLowerCase().includes(query));
+});
 const filteredCollectionCards = computed(() => {
   const query = collectionModal.search.trim().toLowerCase();
   if (!query) return store.cards;
