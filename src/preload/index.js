@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('terminalHelper', {
   validateShellPath: (path) => ipcRenderer.invoke('settings:validate-path', path),
   runCard: (card) => ipcRenderer.invoke('run:card', card),
   runCollection: (collection, cards) => ipcRenderer.invoke('run:collection', { collection, cards }),
+  stopRun: (runId, options) => ipcRenderer.invoke('run:stop', runId, options),
   windowMinimize: () => ipcRenderer.invoke('window:minimize'),
   windowToggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
   windowClose: () => ipcRenderer.invoke('window:close'),

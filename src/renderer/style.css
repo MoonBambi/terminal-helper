@@ -52,6 +52,11 @@ body {
   border-color: #fed7aa;
 }
 
+.stop-card-panel {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
 .card-chip {
   @apply px-2 py-0.5 text-xs rounded-full border border-slate-200 text-slate-600 bg-slate-50;
 }

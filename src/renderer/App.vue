@@ -77,6 +77,37 @@
             <div class="flex-1 overflow-auto pr-1 min-h-0 scroll-fade pb-24 pt-16">
               <div class="grid grid-cols-3 gap-4">
                 <div
+                  v-if="store.selectedCollectionId && store.selectedCollection"
+                  class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start relative stop-card-panel"
+                >
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <h3 class="text-lg font-semibold truncate max-w-[16ch]">停止</h3>
+                      <p class="text-xs text-slate-500 truncate">点击停止时执行</p>
+                    </div>
+                  </div>
+                  <div class="text-xs font-mono text-slate-700 bg-white/80 border border-rose-200 rounded-md px-2 py-1 command-ellipsis">
+                    {{ collectionStopAction.command || '未设置停止命令（编辑集合可配置）' }}
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="card-chip uppercase">{{ collectionStopAction.shell || 'cmd' }}</span>
+                    <span class="card-chip">{{ collectionStopAction.useDedicatedTerminal ? '新终端' : '同终端' }}</span>
+                  </div>
+                  <div class="mt-auto flex items-center justify-center gap-3">
+                    <button class="icon-btn" @click="openStopActionEditor" title="编辑停止">
+                      <PencilIcon class="h-4 w-4" />
+                    </button>
+                    <button
+                      v-if="store.selectedCollection && isCollectionRunning(store.selectedCollection.id)"
+                      class="icon-btn icon-btn-danger"
+                      @click="stopActiveRun"
+                      title="执行停止"
+                    >
+                      <SquareIcon class="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div
                   v-for="entry in displayCards"
                   :key="`${entry.card.id}-${entry.index}`"
                   class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start relative"
@@ -114,7 +145,15 @@
                     <span class="card-chip uppercase">{{ entry.card.shell || 'cmd' }}</span>
                   </div>
                   <div class="mt-auto flex items-center justify-center gap-3">
-                    <button class="icon-btn icon-btn-primary" @click="confirmRunCard(entry.card)" title="执行">
+                    <button
+                      v-if="isCardRunning(entry.card.id)"
+                      class="icon-btn icon-btn-danger"
+                      @click="stopActiveRun"
+                      title="停止"
+                    >
+                      <SquareIcon class="h-4 w-4" />
+                    </button>
+                    <button v-else class="icon-btn icon-btn-primary" @click="confirmRunCard(entry.card)" title="执行">
                       <PlayIcon class="h-4 w-4" />
                     </button>
                     <button
@@ -158,7 +197,16 @@
                     <p class="text-sm font-medium text-slate-700">{{ activeRun.targetName }}</p>
                     <p class="text-xs text-slate-500">{{ activeRun.targetType.toUpperCase() }}</p>
                   </div>
-                  <span class="text-xs" :class="activeRun.status === 'failed' ? 'text-rose-600' : activeRun.status === 'success' ? 'text-emerald-600' : 'text-indigo-600'">
+                  <span
+                    class="text-xs"
+                    :class="
+                      activeRun.status === 'failed' || activeRun.status === 'stopped'
+                        ? 'text-rose-600'
+                        : activeRun.status === 'success'
+                        ? 'text-emerald-600'
+                        : 'text-indigo-600'
+                    "
+                  >
                     {{ activeRun.status }}
                   </span>
                 </div>
@@ -197,7 +245,20 @@
               <button class="fab fab-alt fab-bounce" @click="exportData" title="导出 JSON">
                 <ExportIcon class="h-5 w-5" />
               </button>
-              <button v-if="store.selectedCollection" class="fab fab-play fab-bounce" @click="runCollection(store.selectedCollection)" title="运行集合">
+              <button
+                v-if="store.selectedCollection && isCollectionRunning(store.selectedCollection.id)"
+                class="fab fab-danger fab-bounce"
+                @click="stopActiveRun"
+                title="停止运行"
+              >
+                <SquareIcon class="h-5 w-5" />
+              </button>
+              <button
+                v-else-if="store.selectedCollection"
+                class="fab fab-play fab-bounce"
+                @click="runCollection(store.selectedCollection)"
+                title="运行集合"
+              >
                 <PlayIcon class="h-5 w-5" />
               </button>
             </div>
@@ -362,6 +423,43 @@
         </div>
         <div class="drawer-body space-y-4">
           <input v-model="collectionModal.form.name" class="input" placeholder="集合名称" />
+          <div class="space-y-2">
+            <p class="text-xs text-slate-500">停止（点击停止时执行）</p>
+            <textarea v-model="collectionModal.form.stopAction.command" class="input" placeholder="例如 taskkill /IM node.exe /T /F"></textarea>
+            <div class="space-y-2">
+              <label class="text-xs text-slate-500">停止命令终端</label>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="btn px-4"
+                  :class="collectionModal.form.stopAction.shell === 'cmd' ? 'btn-toggle-active' : ''"
+                  @click="collectionModal.form.stopAction.shell = 'cmd'"
+                >
+                  CMD
+                </button>
+                <button
+                  type="button"
+                  class="btn px-4"
+                  :class="collectionModal.form.stopAction.shell === 'ps' ? 'btn-toggle-active' : ''"
+                  @click="collectionModal.form.stopAction.shell = 'ps'"
+                >
+                  PS
+                </button>
+                <button
+                  type="button"
+                  class="btn px-4"
+                  :class="collectionModal.form.stopAction.shell === 'bash' ? 'btn-toggle-active' : ''"
+                  @click="collectionModal.form.stopAction.shell = 'bash'"
+                >
+                  BASH
+                </button>
+              </div>
+            </div>
+            <label class="flex items-center gap-2 text-xs text-slate-600">
+              <input v-model="collectionModal.form.stopAction.useDedicatedTerminal" type="checkbox" />
+              使用新终端执行停止命令（推荐）
+            </label>
+          </div>
           <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
             <input v-model="collectionModal.search" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none drawer-search-input" placeholder="搜索卡片" />
           </div>
@@ -496,7 +594,11 @@ const collectionModal = reactive({
   open: false,
   mode: 'create',
   collectionId: null,
-  form: { name: '', cardIds: [] },
+  form: {
+    name: '',
+    cardIds: [],
+    stopAction: { name: '停止', command: '', shell: 'cmd', useDedicatedTerminal: true }
+  },
   search: ''
 });
 
@@ -510,9 +612,11 @@ const confirmModal = reactive({
 });
 
 const activeRun = computed(() => store.runLogs.find((r) => r.id === store.activeRunId));
+const isRunActive = computed(() => activeRun.value && activeRun.value.status === 'running');
 const selectedCount = computed(() => selectedForCollection.value.length);
 const selectedCollectionCount = computed(() => selectedCollections.value.length);
 const isCollectionView = computed(() => Boolean(store.selectedCollectionId));
+const collectionStopAction = computed(() => normalizeStopAction(store.selectedCollection?.stopAction));
 const filteredCollectionCards = computed(() => {
   const query = collectionModal.search.trim().toLowerCase();
   if (!query) return store.cards;
@@ -547,6 +651,24 @@ const displayCards = computed(() => {
   return entries;
 });
 const windowMaximized = ref(false);
+
+function isCardRunning(cardId) {
+  return (
+    isRunActive.value &&
+    activeRun.value &&
+    activeRun.value.targetType === 'card' &&
+    activeRun.value.targetId === cardId
+  );
+}
+
+function isCollectionRunning(collectionId) {
+  return (
+    isRunActive.value &&
+    activeRun.value &&
+    activeRun.value.targetType === 'collection' &&
+    activeRun.value.targetId === collectionId
+  );
+}
 
 function formatDate(value) {
   if (!value) return '';
@@ -634,6 +756,26 @@ function toPlain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function defaultStopAction(shell = 'cmd') {
+  return {
+    name: '停止',
+    command: '',
+    shell,
+    useDedicatedTerminal: true
+  };
+}
+
+function normalizeStopAction(action, fallbackShell = 'cmd') {
+  const source = action && typeof action === 'object' ? action : {};
+  const shell = source.shell === 'ps' || source.shell === 'bash' || source.shell === 'cmd' ? source.shell : fallbackShell;
+  return {
+    name: typeof source.name === 'string' && source.name.trim() ? source.name.trim() : '停止',
+    command: typeof source.command === 'string' ? source.command : '',
+    shell,
+    useDedicatedTerminal: source.useDedicatedTerminal !== false
+  };
+}
+
 async function windowMinimize() {
   await window.terminalHelper.windowMinimize();
 }
@@ -690,21 +832,32 @@ function openCollectionModal(collection) {
     collectionModal.collectionId = collection.id;
     collectionModal.form = {
       name: collection.name,
-      cardIds: [...collection.cardIds]
+      cardIds: [...collection.cardIds],
+      stopAction: normalizeStopAction(collection.stopAction)
     };
   } else {
     collectionModal.mode = 'create';
     collectionModal.collectionId = null;
-    collectionModal.form = { name: '', cardIds: [...selectedForCollection.value] };
+    collectionModal.form = {
+      name: '',
+      cardIds: [...selectedForCollection.value],
+      stopAction: defaultStopAction()
+    };
   }
   collectionModal.search = '';
   collectionModal.open = true;
 }
 
+function openStopActionEditor() {
+  if (!store.selectedCollection) return;
+  openCollectionModal(store.selectedCollection);
+}
+
 function saveCollection() {
   const payload = {
     name: collectionModal.form.name.trim(),
-    cardIds: collectionModal.form.cardIds
+    cardIds: collectionModal.form.cardIds,
+    stopAction: normalizeStopAction(collectionModal.form.stopAction)
   };
   if (!payload.name) {
     showToast('请输入集合名称', 'error');
@@ -809,14 +962,15 @@ function editCollectionOrder(index) {
 function commitCollectionOrder(index) {
   const collection = store.selectedCollection;
   if (!collection) return;
+  if (editingOrderId.value !== index) return;
   const total = collection.cardIds.length;
   const next = Number.parseInt(orderInputValue.value, 10);
   if (!Number.isFinite(next) || next < 1 || next > total) {
     showToast('请输入有效序号', 'error');
     return;
   }
-  store.reorderCollectionCardAt(collection.id, index, next - 1);
   editingOrderId.value = null;
+  store.reorderCollectionCardAt(collection.id, index, next - 1);
 }
 
 function cancelCollectionOrder() {
@@ -909,6 +1063,16 @@ function confirmRunCard(card) {
     await window.terminalHelper.runCard(toPlain(card));
   };
   confirmModal.open = true;
+}
+
+async function stopActiveRun() {
+  if (!activeRun.value || activeRun.value.status !== 'running') return;
+  let options = undefined;
+  if (activeRun.value.targetType === 'collection') {
+    const targetCollection = store.collections.find((c) => c.id === activeRun.value.targetId);
+    options = { stopAction: normalizeStopAction(targetCollection?.stopAction) };
+  }
+  await window.terminalHelper.stopRun(activeRun.value.id, options);
 }
 
 function runCollection(collection) {

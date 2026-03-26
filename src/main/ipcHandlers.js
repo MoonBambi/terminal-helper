@@ -6,6 +6,7 @@ const store = require('./store');
 const iconv = require('iconv-lite');
 
 const activeCollections = new Set();
+const activeRuns = new Map();
 
 function sendToRenderer(event, channel, payload) {
   event.sender.send(channel, payload);
@@ -69,6 +70,57 @@ function detectShellPaths() {
     ps: findPath('powershell') || findPath('pwsh') || defaults.ps,
     bash: findPath('bash') || defaults.bash
   };
+}
+
+function normalizeStopAction(value, fallbackShell = 'cmd') {
+  const action = value && typeof value === 'object' ? value : {};
+  const shell = action.shell === 'ps' || action.shell === 'bash' || action.shell === 'cmd' ? action.shell : fallbackShell;
+  return {
+    name: typeof action.name === 'string' && action.name.trim() ? action.name.trim() : 'Stop Card',
+    command: typeof action.command === 'string' ? action.command.trim() : '',
+    shell,
+    useDedicatedTerminal: action.useDedicatedTerminal !== false
+  };
+}
+
+function writeSessionCommand(child, shell, command) {
+  if (!child || child.killed || !command) return false;
+  const normalized = (shell || 'cmd').toLowerCase();
+  const lineBreak = normalized === 'cmd' ? '\r\n' : '\n';
+  try {
+    child.stdin.write(`${command}${lineBreak}`);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function killProcessTree(childOrPid) {
+  const pid = typeof childOrPid === 'number' ? childOrPid : childOrPid && childOrPid.pid;
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    try {
+      spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+    } catch (err) {
+      // ignore
+    }
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGKILL');
+    return;
+  } catch (err) {
+    // ignore
+  }
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch (err) {
+    // ignore
+  }
 }
 
 
@@ -149,6 +201,13 @@ function runCommand(event, card, runId, stepId) {
     sendToRenderer(event, 'run:step-begin', { runId, stepId, cardId: card.id, command: card.command, startedAt });
 
     const child = spawnForShell(card.command, card.shell);
+    activeRuns.set(runId, {
+      type: 'card',
+      targetId: card.id,
+      child,
+      stepId,
+      canceled: false
+    });
 
     child.stdout.on('data', (data) => {
       sendToRenderer(event, 'run:log', {
@@ -172,9 +231,13 @@ function runCommand(event, card, runId, stepId) {
 
     child.on('close', (code) => {
       const endedAt = new Date().toISOString();
-      const status = code === 0 ? 'success' : 'failed';
-      sendToRenderer(event, 'run:step-end', { runId, stepId, exitCode: code, status, endedAt });
-      resolve({ exitCode: code, status, endedAt });
+      const runState = activeRuns.get(runId);
+      const canceled = runState && runState.canceled;
+      const exitCode = canceled ? -1 : code;
+      const status = canceled ? 'stopped' : code === 0 ? 'success' : 'failed';
+      sendToRenderer(event, 'run:step-end', { runId, stepId, exitCode, status, endedAt });
+      activeRuns.delete(runId);
+      resolve({ exitCode, status, endedAt });
     });
   });
 }
@@ -275,6 +338,17 @@ function registerIpcHandlers() {
 
     const shell = cards && cards.length ? cards[0].shell : 'cmd';
     const session = spawnShellSession(shell);
+    const stopAction = normalizeStopAction(collection.stopAction, shell);
+    const runState = {
+      type: 'collection',
+      runId,
+      targetId: collection.id,
+      session,
+      shell,
+      stopAction,
+      canceled: false
+    };
+    activeRuns.set(runId, runState);
     let status = 'success';
     let currentStep = null;
     let stdoutTail = '';
@@ -344,20 +418,25 @@ function registerIpcHandlers() {
     session.on('close', () => {
       if (currentStep) {
         const endedAt = new Date().toISOString();
+        const stopped = runState.canceled;
         sendToRenderer(event, 'run:step-end', {
           runId,
           stepId: currentStep.stepId,
-          exitCode: 1,
-          status: 'failed',
+          exitCode: stopped ? -1 : 1,
+          status: stopped ? 'stopped' : 'failed',
           endedAt
         });
-        currentStep.resolve({ exitCode: 1, status: 'failed' });
+        currentStep.resolve({ exitCode: stopped ? -1 : 1, status: stopped ? 'stopped' : 'failed' });
         currentStep = null;
       }
     });
 
     for (const card of cards) {
       if (status !== 'success') break;
+      if (runState.canceled) {
+        status = 'stopped';
+        break;
+      }
       const stepId = `step_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const startedAtStep = new Date().toISOString();
       sendToRenderer(event, 'run:step-begin', {
@@ -376,16 +455,71 @@ function registerIpcHandlers() {
         session.stdin.write(commandText);
       });
 
-      if (result.exitCode !== 0) {
+      if (runState.canceled) {
+        status = 'stopped';
+      } else if (result.exitCode !== 0) {
         status = 'failed';
       }
     }
 
     closeSession(session, shell);
     const endedAt = new Date().toISOString();
+    if (runState.canceled) {
+      status = 'stopped';
+    }
     sendToRenderer(event, 'run:end', { runId, status, endedAt });
     activeCollections.delete(collection.id);
+    activeRuns.delete(runId);
     return { runId };
+  });
+
+  ipcMain.handle('run:stop', async (event, runId, options) => {
+    if (!runId) return { ok: false, error: 'Missing runId' };
+    const runState = activeRuns.get(runId);
+    if (!runState) return { ok: false, error: 'Not found' };
+    runState.canceled = true;
+    if (runState.type === 'card') {
+      const child = runState.child;
+      try {
+        if (child && !child.killed) {
+          killProcessTree(child);
+        }
+      } catch (err) {
+        // ignore
+      }
+      return { ok: true };
+    }
+    if (runState.type === 'collection') {
+      const session = runState.session;
+      const incomingStopAction = options && typeof options === 'object' ? options.stopAction : null;
+      const stopAction = normalizeStopAction(incomingStopAction || runState.stopAction, runState.shell);
+      try {
+        if (stopAction.command) {
+          if (stopAction.useDedicatedTerminal) {
+            spawnForShell(stopAction.command, stopAction.shell || runState.shell);
+          } else if (session && !session.killed) {
+            try {
+              session.stdin.write('\u0003');
+            } catch (err) {
+              // ignore
+            }
+            writeSessionCommand(session, runState.shell, stopAction.command);
+            await waitMs(200);
+          }
+        }
+        closeSession(session, runState.shell);
+        if (session && !session.killed) {
+          killProcessTree(session);
+        }
+      } catch (err) {
+        // ignore
+      }
+      if (runState.targetId) {
+        activeCollections.delete(runState.targetId);
+      }
+      return { ok: true };
+    }
+    return { ok: false, error: 'Unknown run type' };
   });
 
   ipcMain.handle('window:minimize', (event) => {
@@ -416,6 +550,7 @@ function registerIpcHandlers() {
 }
 
 module.exports = { registerIpcHandlers };
+
 
 
 

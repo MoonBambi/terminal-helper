@@ -1,4 +1,4 @@
-﻿import { defineStore } from 'pinia';
+import { defineStore } from 'pinia';
 
 function makeId(prefix) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -6,7 +6,26 @@ function makeId(prefix) {
   }
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
+function normalizeStopAction(value, fallbackShell = 'cmd') {
+  const action = value && typeof value === 'object' ? value : {};
+  const command = typeof action.command === 'string' ? action.command : '';
+  const shell = action.shell === 'ps' || action.shell === 'bash' || action.shell === 'cmd' ? action.shell : fallbackShell;
+  return {
+    name: typeof action.name === 'string' && action.name.trim() ? action.name.trim() : '停止',
+    command,
+    shell,
+    useDedicatedTerminal: action.useDedicatedTerminal !== false
+  };
+}
 
+function normalizeCollection(collection) {
+  const fallbackShell = collection?.stopAction?.shell || 'cmd';
+  return {
+    ...collection,
+    cardIds: Array.isArray(collection?.cardIds) ? collection.cardIds : [],
+    stopAction: normalizeStopAction(collection?.stopAction, fallbackShell)
+  };
+}
 export const useDataStore = defineStore('data', {
   state: () => ({
     cards: [],
@@ -66,7 +85,7 @@ export const useDataStore = defineStore('data', {
         }
         delete card.tags;
       });
-      this.collections = Array.isArray(data.collections) ? data.collections : [];
+      this.collections = Array.isArray(data.collections) ? data.collections.map((collection) => normalizeCollection(collection)) : [];
       this.runLogs = Array.isArray(data.runLogs) ? data.runLogs : [];
     },
     async persist() {
@@ -132,6 +151,7 @@ export const useDataStore = defineStore('data', {
         id: makeId('collection'),
         name: payload.name,
         cardIds: payload.cardIds || [],
+        stopAction: normalizeStopAction(payload.stopAction),
         createdAt: now,
         updatedAt: now
       });
@@ -155,6 +175,7 @@ export const useDataStore = defineStore('data', {
       if (!collection) return;
       collection.name = payload.name;
       collection.cardIds = payload.cardIds || [];
+      collection.stopAction = normalizeStopAction(payload.stopAction, collection.stopAction?.shell || 'cmd');
       collection.updatedAt = new Date().toISOString();
       this.persist();
     },
@@ -165,6 +186,7 @@ export const useDataStore = defineStore('data', {
         id: makeId('collection'),
         name: `${collection.name} Copy`,
         cardIds: [...collection.cardIds],
+        stopAction: normalizeStopAction(collection.stopAction, collection.stopAction?.shell || 'cmd'),
         createdAt: now,
         updatedAt: now
       });
@@ -283,3 +305,4 @@ export const useDataStore = defineStore('data', {
     }
   }
 });
+
