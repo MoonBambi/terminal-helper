@@ -18,7 +18,7 @@ const defaults = {
 };
 
 function resolveDataDir() {
-  return path.join(app.getPath('userData'), 'data');
+  return path.join(app.getPath('appData'), 'terminal-helper', 'data');
 }
 
 function resolveDataFile() {

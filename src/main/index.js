@@ -3,6 +3,12 @@ const path = require('path');
 const { registerIpcHandlers } = require('./ipcHandlers');
 
 const isDev = !app.isPackaged;
+const appIconPath = path.join(__dirname, 'assets', 'dumbox-icon.png');
+
+app.setName('DumbOx');
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.dumbox.app');
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -10,6 +16,8 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
+    title: 'DumbOx',
+    icon: appIconPath,
     backgroundColor: '#ffffff',
     frame: false,
     webPreferences: {

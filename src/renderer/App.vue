@@ -45,7 +45,7 @@
             @click="activePage = 'cards'; store.selectedCollectionId = null"
           >
             <AllCardsIcon class="h-4 w-4" />
-            全部卡片
+            草料
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -53,7 +53,7 @@
             @click="activePage = 'collections'"
           >
             <CollectionsIcon class="h-4 w-4" />
-            集合管理
+            牛群
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -61,7 +61,7 @@
             @click="activePage = 'tasks'"
           >
             <TasksIcon class="h-4 w-4" />
-            任务
+            耕地
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -69,7 +69,7 @@
             @click="activePage = 'terminal'"
           >
             <TerminalIcon class="h-4 w-4" />
-            终端
+            老牛工位
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -77,7 +77,7 @@
             @click="activePage = 'settings'"
           >
             <SettingsIcon class="h-4 w-4" />
-            设置
+            牛棚配置
           </button>
         </nav>
         <div class="flex items-center justify-between text-xs text-slate-400">

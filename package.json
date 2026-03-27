@@ -1,5 +1,6 @@
 {
   "name": "terminal-helper",
+  "productName": "DumbOx",
   "version": "0.1.0",
   "description": "Visual card-based terminal command manager",
   "main": "src/main/index.js",
