@@ -39,6 +39,42 @@ body {
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
+.logo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.logo-button:active {
+  transform: scale(0.94);
+}
+
+.logo-spin-pop {
+  transform-origin: center;
+  animation: logoSpinPop 0.56s cubic-bezier(0.2, 0.9, 0.22, 1) both;
+}
+
+@keyframes logoSpinPop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  40% {
+    transform: scale(1.22) rotate(150deg);
+  }
+  72% {
+    transform: scale(0.9) rotate(310deg);
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+  }
+}
+
 .card-shell-cmd {
   background: #eef2ff;
   border-color: #c7d2fe;
@@ -260,8 +296,24 @@ body {
   -webkit-backdrop-filter: blur(28px) saturate(1.4);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 8px;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+}
+
+.titlebar-brand {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titlebar-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.titlebar-logo {
+  border-radius: 8px;
 }
 
 .sidebar {

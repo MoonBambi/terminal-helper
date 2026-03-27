@@ -1,25 +1,43 @@
 ﻿<template>
   <div class="h-screen bg-white text-slate-800 overflow-hidden">
     <div class="titlebar">
-      <button class="titlebar-btn" @click="windowMinimize" title="最小化">
-        <MinusIcon class="h-4 w-4" />
-      </button>
-      <button class="titlebar-btn" @click="windowToggleMaximize" title="最大化">
-        <SquareIcon class="h-4 w-4" />
-      </button>
-      <button class="titlebar-btn close" @click="windowClose" title="关闭">
-        <CloseIcon class="h-4 w-4" />
-      </button>
+      <div class="titlebar-brand">
+        <button type="button" class="logo-button titlebar-logo" @click="playLogoAnimation" title="DumbOx">
+          <svg
+            :key="`logo-${logoAnimSeed}`"
+            class="h-8 w-8 shrink-0 logo-spin-pop"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            shape-rendering="crispEdges"
+          >
+            <rect x="3" y="5" width="10" height="8" fill="#EEE8D5" />
+            <rect x="2" y="4" width="2" height="2" fill="#586E75" />
+            <rect x="12" y="4" width="2" height="2" fill="#586E75" />
+            <rect x="5" y="7" width="2" height="2" fill="#002B36" />
+            <rect x="9" y="7" width="2" height="2" fill="#002B36" />
+            <rect x="5" y="10" width="6" height="3" fill="#2AA198" />
+            <rect x="6" y="11" width="1" height="1" fill="#002B36" opacity="0.5" />
+            <rect x="9" y="11" width="1" height="1" fill="#002B36" opacity="0.5" />
+            <path d="M3 5H13V13H3V5Z" stroke="#002B36" stroke-width="1" fill="none" />
+          </svg>
+        </button>
+        <h1 class="text-base font-semibold tracking-wide text-slate-800 leading-none">DumbOx</h1>
+      </div>
+      <div class="titlebar-actions">
+        <button class="titlebar-btn" @click="windowMinimize" title="最小化">
+          <MinusIcon class="h-4 w-4" />
+        </button>
+        <button class="titlebar-btn" @click="windowToggleMaximize" title="最大化">
+          <SquareIcon class="h-4 w-4" />
+        </button>
+        <button class="titlebar-btn close" @click="windowClose" title="关闭">
+          <CloseIcon class="h-4 w-4" />
+        </button>
+      </div>
     </div>
     <div class="grid grid-cols-[240px_1fr] h-[calc(100vh-36px)] bg-white overflow-hidden">
       <aside class="sidebar px-4 py-6 h-full min-h-0 flex flex-col overflow-hidden">
-        <div class="mb-6 flex items-center gap-2">
-          <div class="h-8 w-8 rounded-xl bg-indigo-600/10 border border-indigo-600/20"></div>
-          <div>
-            <h1 class="text-sm font-semibold tracking-wide text-slate-800">Terminal Helper</h1>
-            <p class="text-[11px] text-slate-400">Command Cards</p>
-          </div>
-        </div>
         <nav class="space-y-1 mb-6 text-sm">
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -864,6 +882,7 @@ const TasksIcon = ListTodo;
 
 const store = useDataStore();
 const activePage = ref('cards');
+const logoAnimSeed = ref(0);
 const fabAnimKey = ref(0);
 const logCollapsed = ref(false);
 const settingsForm = reactive({ cmd: 'cmd.exe', ps: 'powershell.exe', bash: 'bash' });
@@ -884,6 +903,10 @@ const terminalContainerRefs = new Map();
 const terminalStates = new Map();
 const collectionRunTabByRunId = new Map();
 const pendingCollectionRunTab = ref(null);
+
+function playLogoAnimation() {
+  logoAnimSeed.value += 1;
+}
 
 const cardModal = reactive({
   open: false,
