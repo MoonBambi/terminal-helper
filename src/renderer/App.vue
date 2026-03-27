@@ -22,18 +22,28 @@
         </div>
         <nav class="space-y-1 mb-6 text-sm">
           <button
-            class="w-full text-left px-3 py-2 rounded-md"
+            class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
             :class="activePage === 'cards' && !store.selectedCollectionId ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
             @click="activePage = 'cards'; store.selectedCollectionId = null"
           >
+            <AllCardsIcon class="h-4 w-4" />
             全部卡片
           </button>
           <button
-            class="w-full text-left px-3 py-2 rounded-md"
+            class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
             :class="activePage === 'collections' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
             @click="activePage = 'collections'"
           >
+            <CollectionsIcon class="h-4 w-4" />
             集合管理
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
+            :class="activePage === 'tasks' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
+            @click="activePage = 'tasks'"
+          >
+            <TasksIcon class="h-4 w-4" />
+            任务
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -200,7 +210,17 @@
                   </button>
                   <h2 class="text-sm font-semibold text-slate-700">历史运行记录</h2>
                 </div>
-                <span class="text-xs text-slate-500">{{ collectionHistoryLogs.length }} 条</span>
+                <div class="flex items-center gap-1">
+                  <button
+                    class="icon-btn"
+                    :class="isCollectionHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''"
+                    @click="clearCollectionHistoryLogs"
+                    title="清理历史"
+                  >
+                    <BroomIcon class="h-4 w-4" />
+                  </button>
+                  <span class="text-xs text-slate-500">{{ collectionHistoryLogs.length }} 条</span>
+                </div>
               </div>
               <div v-if="!logCollapsed" class="space-y-3">
                 <div class="log-box rounded-lg p-3 max-h-[320px] overflow-auto space-y-3">
@@ -347,24 +367,146 @@
               </button>
             </div>
           </main>
-          <main v-show="activePage === 'terminal'" class="space-y-4 h-full flex flex-col min-h-0 terminal-panel pt-8 pl-8 pr-4 pb-4">
-            <div class="flex items-start justify-between mb-3 gap-4">
-              <div>
-                <h3 class="text-sm font-semibold text-slate-700">终端</h3>
-                <p class="text-xs text-slate-400">内嵌终端会话</p>
+          <main v-else-if="activePage === 'tasks'" class="space-y-4 h-full flex flex-col min-h-0">
+            <div class="rounded-xl p-4 space-y-4 flex-1 overflow-hidden min-h-0 flex flex-col">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold text-slate-700">任务列表</h3>
+                  <p class="text-xs text-slate-400">创建任务并串行运行所选集合</p>
+                </div>
               </div>
-              <div v-if="terminalTabs.length" class="terminal-tabs terminal-tabs-inline">
+              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
+                <input v-model="taskSearchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索任务名称" />
+              </div>
+              <div class="space-y-2 overflow-auto pr-1 min-h-0 flex-1 scroll-fade pt-2 pb-24">
                 <div
-                  v-for="tab in terminalTabs"
-                  :key="tab.id"
-                  class="terminal-tab"
-                  :class="activeTerminalTabId === tab.id ? 'active' : ''"
-                  @click="switchTerminalTab(tab.id)"
+                  v-for="task in filteredTasks"
+                  :key="task.id"
+                  class="task-row rounded-lg px-3 py-2"
+                  :class="`task-row-status-${taskRunStatus(task.id)}`"
                 >
-                  <span class="terminal-tab-label">{{ tab.label }}</span>
-                  <button type="button" class="terminal-tab-close" title="关闭终端标签" @click.stop="closeTerminalTab(tab.id)">
-                    <CloseIcon class="h-3 w-3" />
-                  </button>
+                  <div v-if="latestTaskRun(task.id)" class="task-row-progress" :style="{ width: `${taskProgressPercent(task.id)}%` }"></div>
+                  <div class="task-row-content flex items-center justify-between">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-slate-700 truncate">{{ task.name }}</p>
+                      <p class="text-xs text-slate-400 truncate">{{ task.collectionIds.length }} 个集合 · {{ taskCollectionsText(task) }}</p>
+                      <p class="text-xs mt-0.5" :class="taskProgressTone(task.id)">{{ taskProgressText(task.id) }}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        class="icon-btn icon-btn-primary"
+                        :class="isRunActive || isTaskRunning(task.id) ? 'opacity-40 pointer-events-none' : ''"
+                        @click="runTask(task)"
+                        title="运行任务"
+                      >
+                        <PlayIcon class="h-4 w-4" />
+                      </button>
+                      <button class="icon-btn" @click="openTaskModal(task)" title="编辑">
+                        <PencilIcon class="h-4 w-4" />
+                      </button>
+                      <button class="icon-btn" @click="store.duplicateTask(task)" title="复制">
+                        <CopyIcon class="h-4 w-4" />
+                      </button>
+                      <button class="icon-btn icon-btn-danger" @click="confirmDeleteTask(task)" title="删除">
+                        <TrashIcon class="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div v-if="taskCompletedBadges(task.id).length" class="task-complete-badges">
+                    <div
+                      v-for="badge in taskCompletedBadges(task.id)"
+                      :key="`task-badge-${task.id}-${badge.key}-${taskDoneAnimSeed}`"
+                      class="task-complete-badge-item"
+                      :class="badge.mode === 'error' ? 'task-complete-badge-item-error' : ''"
+                      :title="badge.title"
+                      :style="{ animationDelay: `${badge.index * 60}ms` }"
+                    >
+                      <CheckIcon v-if="badge.mode === 'success'" class="h-4 w-4" />
+                      <CloseIcon v-else class="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+                <div v-if="filteredTasks.length === 0" class="text-sm text-slate-400 py-6 text-center">
+                  还没有任务，点击“新建任务”开始。
+                </div>
+              </div>
+              <section
+                class="card-panel rounded-xl transition-all overflow-hidden fixed right-6 bottom-6 w-[360px] max-w-full max-h-[70vh] z-20"
+                :class="taskHistoryCollapsed ? 'p-3' : 'p-4 space-y-4'"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1">
+                    <button class="icon-btn" @click="taskHistoryCollapsed = !taskHistoryCollapsed" title="折叠/展开">
+                      <ChevronDownIcon class="h-4 w-4 transition-transform" :class="taskHistoryCollapsed ? '-rotate-90' : ''" />
+                    </button>
+                    <h2 class="text-sm font-semibold text-slate-700">任务历史记录</h2>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="icon-btn"
+                      :class="isTaskHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''"
+                      @click="clearTaskHistoryLogs"
+                      title="清理历史"
+                    >
+                      <BroomIcon class="h-4 w-4" />
+                    </button>
+                    <span class="text-xs text-slate-500">{{ taskHistoryLogs.length }} 条</span>
+                  </div>
+                </div>
+                <div v-if="!taskHistoryCollapsed" class="space-y-3">
+                  <div class="log-box rounded-lg p-3 max-h-[320px] overflow-auto space-y-3">
+                    <template v-if="taskHistoryLogs.length">
+                      <div
+                        v-for="log in taskHistoryLogs"
+                        :key="log.id"
+                        class="rounded-lg border border-slate-200 bg-white/70 px-3 py-2 space-y-1"
+                      >
+                        <div class="flex items-center justify-between gap-2">
+                          <p class="text-sm font-medium text-slate-700 truncate">{{ log.taskName }}</p>
+                          <span class="text-xs" :class="taskHistoryTone(log.status)">{{ log.status }}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500">
+                          开始：{{ formatDate(log.startedAt) }}
+                        </p>
+                        <p class="text-[11px] text-slate-500">
+                          结束：{{ log.endedAt ? formatDate(log.endedAt) : '运行中' }} · 耗时：{{ formatDuration(log.startedAt, log.endedAt) }}
+                        </p>
+                        <p class="text-[11px] text-slate-500">
+                          进度 {{ log.completedCollections || 0 }}/{{ log.totalCollections || 0 }}
+                        </p>
+                      </div>
+                    </template>
+                    <p v-else class="text-[11px] text-slate-500">暂无任务历史记录</p>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="fab-group" :key="`fab-tasks-${activePage}-${fabAnimKey}`">
+              <button class="fab fab-bounce" @click="openTaskModal()" title="新建任务">
+                <TasksIcon class="h-5 w-5" />
+              </button>
+            </div>
+          </main>
+          <main v-show="activePage === 'terminal'" class="space-y-4 h-full flex flex-col min-h-0 terminal-panel pt-8 pl-8 pr-4 pb-4">
+            <div class="flex items-center justify-between mb-3 gap-4">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-700">(=^･ω･^=)</h3>
+                <p class="text-xs text-slate-400">ฅ^•ﻌ•^ฅ</p>
+              </div>
+              <div v-if="terminalTabs.length" class="terminal-tabs-strip">
+                <div class="terminal-tabs" @wheel.prevent="handleTerminalTabsWheel">
+                  <div
+                    v-for="tab in terminalTabs"
+                    :key="tab.id"
+                    class="terminal-tab"
+                    :class="activeTerminalTabId === tab.id ? 'active' : ''"
+                    @click="switchTerminalTab(tab.id)"
+                  >
+                    <span class="terminal-tab-label">{{ tab.label }}</span>
+                    <button type="button" class="terminal-tab-close" title="关闭终端标签" @click.stop="closeTerminalTab(tab.id)">
+                      <CloseIcon class="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -586,6 +728,63 @@
       </aside>
     </div>
 
+    <div v-if="taskModal.open" class="fixed inset-0 z-[60]">
+      <div class="absolute inset-0 bg-black/30" @click="taskModal.open = false"></div>
+      <aside class="drawer-panel drawer-wide">
+        <div class="drawer-header">
+          <h3 class="text-lg font-semibold">{{ taskModal.mode === 'edit' ? '编辑任务' : '新建任务' }}</h3>
+          <button class="icon-btn" @click="taskModal.open = false" title="关闭">
+            <CloseIcon class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="drawer-body space-y-4">
+          <input v-model="taskModal.form.name" class="input" placeholder="任务名称" />
+          <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
+            <input v-model="taskModal.search" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none drawer-search-input" placeholder="搜索集合" />
+          </div>
+          <div class="collection-split">
+            <div class="collection-split-section">
+              <p class="text-xs text-slate-500">所有集合</p>
+              <div class="collection-list-panel collection-fill">
+                <div class="collection-list-inner space-y-2">
+                  <button
+                    v-for="collection in filteredTaskCollections"
+                    :key="collection.id"
+                    type="button"
+                    class="collection-add-item"
+                    @click="addCollectionToTaskDraft(collection.id)"
+                  >
+                    <span class="hover-reveal-text" :title="collection.name">{{ collection.name }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="collection-split-section">
+              <p class="text-xs text-slate-500">已选集合</p>
+              <div class="collection-list-panel collection-fill">
+                <div class="collection-list-inner space-y-2">
+                  <div
+                    v-for="(collectionId, index) in taskModal.form.collectionIds"
+                    :key="`${collectionId}-${index}`"
+                    class="selected-row"
+                  >
+                    <span class="hover-reveal-text" :title="collectionName(collectionId)">{{ collectionName(collectionId) }}</span>
+                    <button class="selected-remove" @click.stop="removeSelectedCollection(index)" title="移除">
+                      <CloseIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="drawer-footer">
+          <button class="btn" @click="taskModal.open = false">取消</button>
+          <button class="btn btn-primary" @click="saveTask">保存</button>
+        </div>
+      </aside>
+    </div>
+
     <div v-if="confirmModal.open" class="fixed inset-0 bg-black/30 flex items-center justify-center z-[60]">
       <div class="card-panel rounded-xl p-6 w-[520px] space-y-4">
         <h3 class="text-lg font-semibold">{{ confirmModal.title }}</h3>
@@ -633,7 +832,10 @@ import {
   Circle,
   CheckCircle2,
   Terminal,
-  BrushCleaning
+  BrushCleaning,
+  LayoutGrid,
+  FolderKanban,
+  ListTodo
 } from 'lucide-vue-next';
 import { useDataStore } from './modules/terminal/terminalStore';
 
@@ -656,6 +858,9 @@ const CircleIcon = Circle;
 const CheckCircleIcon = CheckCircle2;
 const TerminalIcon = Terminal;
 const BroomIcon = BrushCleaning;
+const AllCardsIcon = LayoutGrid;
+const CollectionsIcon = FolderKanban;
+const TasksIcon = ListTodo;
 
 const store = useDataStore();
 const activePage = ref('cards');
@@ -669,6 +874,9 @@ const editingOrderId = ref(null);
 const orderInputValue = ref('');
 const orderInputRefs = new Map();
 const collectionSearchQuery = ref('');
+const taskSearchQuery = ref('');
+const taskDoneAnimSeed = ref(0);
+const taskHistoryCollapsed = ref(false);
 const terminalTabs = ref([]);
 const terminalTabSeed = ref(0);
 const activeTerminalTabId = ref('');
@@ -692,6 +900,17 @@ const collectionModal = reactive({
     name: '',
     cardIds: [],
     stopAction: { name: '停止', command: '', shell: 'cmd', useDedicatedTerminal: true }
+  },
+  search: ''
+});
+
+const taskModal = reactive({
+  open: false,
+  mode: 'create',
+  taskId: null,
+  form: {
+    name: '',
+    collectionIds: []
   },
   search: ''
 });
@@ -721,6 +940,39 @@ const filteredCollections = computed(() => {
   const query = collectionSearchQuery.value.trim().toLowerCase();
   if (!query) return store.collections;
   return store.collections.filter((collection) => collection.name.toLowerCase().includes(query));
+});
+const filteredTasks = computed(() => {
+  const query = taskSearchQuery.value.trim().toLowerCase();
+  if (!query) return store.tasks;
+  return store.tasks.filter((task) => task.name.toLowerCase().includes(query));
+});
+const filteredTaskCollections = computed(() => {
+  const query = taskModal.search.trim().toLowerCase();
+  if (!query) return store.collections;
+  return store.collections.filter((collection) => collection.name.toLowerCase().includes(query));
+});
+const taskHistoryLogs = computed(() => store.taskRunLogs || []);
+const taskLatestRunByTaskId = computed(() => {
+  const map = new Map();
+  for (const log of taskHistoryLogs.value) {
+    if (!log || !log.taskId) continue;
+    if (!map.has(log.taskId)) {
+      map.set(log.taskId, log);
+    }
+  }
+  return map;
+});
+const isCollectionHistoryClearDisabled = computed(() => {
+  if (!collectionHistoryLogs.value.length) return true;
+  return Boolean(
+    activeRun.value &&
+      activeRun.value.status === 'running' &&
+      activeRun.value.targetType === 'collection'
+  );
+});
+const isTaskHistoryClearDisabled = computed(() => {
+  if (!taskHistoryLogs.value.length) return true;
+  return taskHistoryLogs.value.some((log) => log && log.status === 'running');
 });
 const filteredCollectionCards = computed(() => {
   const query = collectionModal.search.trim().toLowerCase();
@@ -800,6 +1052,13 @@ function setTerminalContainerRef(tabId, el) {
 
 function switchTerminalTab(tabId) {
   activeTerminalTabId.value = tabId;
+}
+
+function handleTerminalTabsWheel(event) {
+  const el = event.currentTarget;
+  if (!el) return;
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  el.scrollLeft += delta;
 }
 
 async function closeTerminalTab(tabId) {
@@ -1250,12 +1509,150 @@ function cardName(cardId) {
   return card ? card.name : '未知卡片';
 }
 
+function collectionName(collectionId) {
+  const collection = store.collections.find((c) => c.id === collectionId);
+  return collection ? collection.name : '未知集合';
+}
+
+function taskCollectionsText(task) {
+  if (!task || !Array.isArray(task.collectionIds) || task.collectionIds.length === 0) {
+    return '未选择集合';
+  }
+  return task.collectionIds.map((id) => collectionName(id)).join(' / ');
+}
+
+function makeTaskRunLogId() {
+  return `taskrun_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function latestTaskRun(taskId) {
+  return taskLatestRunByTaskId.value.get(taskId) || null;
+}
+
+function isTaskRunning(taskId) {
+  const run = latestTaskRun(taskId);
+  return Boolean(run && run.status === 'running');
+}
+
+function taskCompletedBadges(taskId) {
+  const run = latestTaskRun(taskId);
+  if (!run || !Array.isArray(run.history)) return [];
+  const badges = [];
+  run.history.forEach((item, index) => {
+    if (!item) return;
+    if (item.status !== 'success' && item.status !== 'skipped' && item.status !== 'failed' && item.status !== 'stopped') {
+      return;
+    }
+    const mode = item.status === 'failed' || item.status === 'stopped' ? 'error' : 'success';
+    const label = item.collectionName || `集合 ${index + 1}`;
+    badges.push({
+      key: `${run.id || 'run'}-${index}-${mode}`,
+      index,
+      mode,
+      title: `${label}：${item.status}`
+    });
+  });
+  return badges;
+}
+
+function taskRunStatus(taskId) {
+  const run = latestTaskRun(taskId);
+  return run?.status || 'idle';
+}
+
+function taskProgressPercent(taskId) {
+  const run = latestTaskRun(taskId);
+  if (!run) return 0;
+  const total = Math.max(1, Number(run.totalCollections || 0));
+  const completed = Math.max(0, Number(run.completedCollections || 0));
+  const ratio = Math.max(0, Math.min(1, completed / total));
+  return Math.round(ratio * 100);
+}
+
+function taskProgressText(taskId) {
+  const run = latestTaskRun(taskId);
+  if (!run) return '未运行';
+  const completed = Number(run.completedCollections || 0);
+  const total = Number(run.totalCollections || 0);
+  if (run.status === 'running') {
+    const current = run.currentCollectionName ? ` · 当前：${run.currentCollectionName}` : '';
+    return `进行中 ${completed}/${total}${current}`;
+  }
+  return `最近一次：${run.status} (${completed}/${total})`;
+}
+
+function taskProgressTone(taskId) {
+  const run = latestTaskRun(taskId);
+  if (!run) return 'text-slate-400';
+  if (run.status === 'running') return 'text-indigo-600';
+  if (run.status === 'success') return 'text-emerald-600';
+  if (run.status === 'failed' || run.status === 'stopped') return 'text-rose-600';
+  return 'text-slate-500';
+}
+
+function taskHistoryTone(status) {
+  if (status === 'running') return 'text-indigo-600';
+  if (status === 'success') return 'text-emerald-600';
+  if (status === 'failed' || status === 'stopped') return 'text-rose-600';
+  return 'text-slate-500';
+}
+
 function addCardToCollectionDraft(cardId) {
   collectionModal.form.cardIds.push(cardId);
 }
 
 function removeSelectedCard(index) {
   collectionModal.form.cardIds.splice(index, 1);
+}
+
+function addCollectionToTaskDraft(collectionId) {
+  taskModal.form.collectionIds.push(collectionId);
+}
+
+function removeSelectedCollection(index) {
+  taskModal.form.collectionIds.splice(index, 1);
+}
+
+function openTaskModal(task) {
+  if (task) {
+    taskModal.mode = 'edit';
+    taskModal.taskId = task.id;
+    taskModal.form = {
+      name: task.name,
+      collectionIds: [...task.collectionIds]
+    };
+  } else {
+    taskModal.mode = 'create';
+    taskModal.taskId = null;
+    taskModal.form = {
+      name: '',
+      collectionIds: []
+    };
+  }
+  taskModal.search = '';
+  taskModal.open = true;
+}
+
+function saveTask() {
+  const payload = {
+    name: taskModal.form.name.trim(),
+    collectionIds: taskModal.form.collectionIds
+  };
+  if (!payload.name) {
+    showToast('请输入任务名称', 'error');
+    return;
+  }
+  if (payload.collectionIds.length === 0) {
+    showToast('请至少选择一个集合', 'error');
+    return;
+  }
+  if (taskModal.mode === 'edit') {
+    store.updateTask(taskModal.taskId, payload);
+  } else {
+    store.addTask(payload);
+  }
+  taskModal.open = false;
+  showToast('任务已保存', 'success');
 }
 
 function selectionKey(cardId, index) {
@@ -1425,6 +1822,18 @@ function confirmDeleteCollection(collection) {
   confirmModal.open = true;
 }
 
+function confirmDeleteTask(task) {
+  confirmModal.title = '删除任务';
+  confirmModal.message = `确认删除任务「${task.name}」吗？`;
+  confirmModal.details = task.collectionIds.map((id) => collectionName(id)).join('\n') || '未选择集合';
+  confirmModal.confirmText = '确认删除';
+  confirmModal.onConfirm = () => {
+    store.deleteTask(task.id);
+    confirmModal.open = false;
+  };
+  confirmModal.open = true;
+}
+
 function confirmRunCard(card) {
   confirmModal.title = '执行命令';
   confirmModal.message = `即将执行卡片「${card.name}」`;
@@ -1445,6 +1854,21 @@ async function stopActiveRun() {
     options = { stopAction: normalizeStopAction(targetCollection?.stopAction) };
   }
   await window.terminalHelper.stopRun(activeRun.value.id, options);
+}
+
+function clearCollectionHistoryLogs() {
+  if (isCollectionHistoryClearDisabled.value) return;
+  const total = collectionHistoryLogs.value.length;
+  const collectionId = store.selectedCollectionId || null;
+  store.clearCollectionRunLogs(collectionId);
+  showToast(`已清理 ${total} 条集合历史`, 'success');
+}
+
+function clearTaskHistoryLogs() {
+  if (isTaskHistoryClearDisabled.value) return;
+  const total = taskHistoryLogs.value.length;
+  store.clearTaskRunLogs();
+  showToast(`已清理 ${total} 条任务历史`, 'success');
 }
 
 function runCollection(collection) {
@@ -1468,6 +1892,130 @@ function runCollection(collection) {
     if (!state) return;
     pendingCollectionRunTab.value = tabId;
     window.terminalHelper.runCollection(toPlain(collection), cards.map(toPlain));
+  };
+  confirmModal.open = true;
+}
+
+function runTask(task) {
+  const collectionIds = task.collectionIds.filter((id) => store.collections.some((c) => c.id === id));
+  if (!collectionIds.length) {
+    showToast('任务没有可执行集合', 'error');
+    return;
+  }
+  confirmModal.title = '运行任务';
+  confirmModal.message = `即将串行运行任务「${task.name}」`;
+  confirmModal.details = collectionIds.map((id, index) => `${index + 1}. ${collectionName(id)}`).join('\n');
+  confirmModal.confirmText = '确认执行';
+  confirmModal.onConfirm = async () => {
+    confirmModal.open = false;
+    const taskRunId = makeTaskRunLogId();
+    const startedAt = new Date().toISOString();
+    store.addTaskRunLog({
+      id: taskRunId,
+      taskId: task.id,
+      taskName: task.name,
+      status: 'running',
+      startedAt,
+      endedAt: null,
+      totalCollections: collectionIds.length,
+      completedCollections: 0,
+      currentCollectionId: null,
+      currentCollectionName: '',
+      history: collectionIds.map((id) => ({
+        collectionId: id,
+        collectionName: collectionName(id),
+        status: 'pending',
+        startedAt: null,
+        endedAt: null
+      }))
+    });
+    let finalStatus = 'success';
+    let completed = 0;
+    for (const collectionId of collectionIds) {
+      const collection = store.collections.find((c) => c.id === collectionId);
+      if (!collection) continue;
+      const startedAtStep = new Date().toISOString();
+      const currentHistory = (store.taskRunLogs.find((log) => log.id === taskRunId)?.history || []).map((item) => {
+        if (item.collectionId !== collectionId) return item;
+        return { ...item, status: 'running', startedAt: startedAtStep };
+      });
+      store.updateTaskRunLog(taskRunId, {
+        currentCollectionId: collectionId,
+        currentCollectionName: collection.name,
+        history: currentHistory
+      });
+      const cards = collection.cardIds.map((id) => store.cards.find((c) => c.id === id)).filter(Boolean);
+      if (!cards.length) {
+        showToast(`集合「${collection.name}」没有可执行卡片，已跳过`, 'error');
+        completed += 1;
+        const history = (store.taskRunLogs.find((log) => log.id === taskRunId)?.history || []).map((item) => {
+          if (item.collectionId !== collectionId) return item;
+          return { ...item, status: 'skipped', endedAt: new Date().toISOString() };
+        });
+        store.updateTaskRunLog(taskRunId, { completedCollections: completed, history });
+        continue;
+      }
+      const preferredShell = cards[0]?.shell || 'cmd';
+      const tabId = createCollectionTerminalTab(preferredShell, collection.name);
+      activeTerminalTabId.value = tabId;
+      activePage.value = 'terminal';
+      await nextTick();
+      const state = await ensureTerminalTab(tabId, preferredShell);
+      if (!state) {
+        finalStatus = 'failed';
+        const history = (store.taskRunLogs.find((log) => log.id === taskRunId)?.history || []).map((item) => {
+          if (item.collectionId !== collectionId) return item;
+          return { ...item, status: 'failed', endedAt: new Date().toISOString() };
+        });
+        store.updateTaskRunLog(taskRunId, { history });
+        break;
+      }
+      pendingCollectionRunTab.value = tabId;
+      const result = await window.terminalHelper.runCollection(toPlain(collection), cards.map(toPlain));
+      if (result && result.error) {
+        finalStatus = 'failed';
+        const history = (store.taskRunLogs.find((log) => log.id === taskRunId)?.history || []).map((item) => {
+          if (item.collectionId !== collectionId) return item;
+          return { ...item, status: 'failed', endedAt: new Date().toISOString() };
+        });
+        store.updateTaskRunLog(taskRunId, {
+          currentCollectionId: collectionId,
+          currentCollectionName: collection.name,
+          completedCollections: completed,
+          history
+        });
+        showToast(`任务中断：${result.error}`, 'error');
+        break;
+      }
+      const collectionStatus = result?.status || 'failed';
+      if (collectionStatus === 'success' || collectionStatus === 'skipped') {
+        completed += 1;
+      }
+      const history = (store.taskRunLogs.find((log) => log.id === taskRunId)?.history || []).map((item) => {
+        if (item.collectionId !== collectionId) return item;
+        return { ...item, status: collectionStatus, endedAt: new Date().toISOString() };
+      });
+      store.updateTaskRunLog(taskRunId, {
+        completedCollections: completed,
+        currentCollectionId: collectionId,
+        currentCollectionName: collection.name,
+        history
+      });
+      if (collectionStatus === 'failed' || collectionStatus === 'stopped') {
+        finalStatus = collectionStatus;
+        showToast(`任务在「${collection.name}」结束：${collectionStatus}`, 'error');
+        break;
+      }
+    }
+    store.updateTaskRunLog(taskRunId, {
+      status: finalStatus,
+      endedAt: new Date().toISOString(),
+      currentCollectionId: null,
+      currentCollectionName: ''
+    });
+    if (finalStatus === 'success') {
+      showToast(`任务「${task.name}」执行完成`, 'success');
+    }
   };
   confirmModal.open = true;
 }
@@ -1553,6 +2101,9 @@ onMounted(async () => {
     (value) => {
       if (value === 'settings') {
         syncSettingsForm();
+      }
+      if (value === 'tasks') {
+        taskDoneAnimSeed.value += 1;
       }
       if (value === 'terminal') {
         const tabId = activeTerminalTabId.value;

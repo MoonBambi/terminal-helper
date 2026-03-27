@@ -26,10 +26,19 @@ function normalizeCollection(collection) {
     stopAction: normalizeStopAction(collection?.stopAction, fallbackShell)
   };
 }
+
+function normalizeTask(task) {
+  return {
+    ...task,
+    collectionIds: Array.isArray(task?.collectionIds) ? task.collectionIds : []
+  };
+}
 export const useDataStore = defineStore('data', {
   state: () => ({
     cards: [],
     collections: [],
+    tasks: [],
+    taskRunLogs: [],
     runLogs: [],
     pendingLogs: {},
     settings: {
@@ -86,6 +95,8 @@ export const useDataStore = defineStore('data', {
         delete card.tags;
       });
       this.collections = Array.isArray(data.collections) ? data.collections.map((collection) => normalizeCollection(collection)) : [];
+      this.tasks = Array.isArray(data.tasks) ? data.tasks.map((task) => normalizeTask(task)) : [];
+      this.taskRunLogs = Array.isArray(data.taskRunLogs) ? data.taskRunLogs : [];
       this.runLogs = Array.isArray(data.runLogs) ? data.runLogs : [];
     },
     async persist() {
@@ -93,6 +104,8 @@ export const useDataStore = defineStore('data', {
         JSON.stringify({
           cards: this.cards,
           collections: this.collections,
+          tasks: this.tasks,
+          taskRunLogs: this.taskRunLogs,
           runLogs: this.runLogs,
           settings: this.settings
         })
@@ -194,9 +207,63 @@ export const useDataStore = defineStore('data', {
     },
     deleteCollection(id) {
       this.collections = this.collections.filter((c) => c.id !== id);
+      this.tasks = this.tasks.map((task) => ({
+        ...task,
+        collectionIds: task.collectionIds.filter((collectionId) => collectionId !== id)
+      }));
       if (this.selectedCollectionId === id) {
         this.selectedCollectionId = null;
       }
+      this.persist();
+    },
+    addTask(payload) {
+      const now = new Date().toISOString();
+      this.tasks.unshift({
+        id: makeId('task'),
+        name: payload.name,
+        collectionIds: Array.isArray(payload.collectionIds) ? payload.collectionIds : [],
+        createdAt: now,
+        updatedAt: now
+      });
+      this.persist();
+    },
+    updateTask(id, payload) {
+      const task = this.tasks.find((t) => t.id === id);
+      if (!task) return;
+      task.name = payload.name;
+      task.collectionIds = Array.isArray(payload.collectionIds) ? payload.collectionIds : [];
+      task.updatedAt = new Date().toISOString();
+      this.persist();
+    },
+    duplicateTask(task) {
+      const now = new Date().toISOString();
+      this.tasks.unshift({
+        ...task,
+        id: makeId('task'),
+        name: `${task.name} Copy`,
+        collectionIds: [...task.collectionIds],
+        createdAt: now,
+        updatedAt: now
+      });
+      this.persist();
+    },
+    deleteTask(id) {
+      this.tasks = this.tasks.filter((t) => t.id !== id);
+      this.taskRunLogs = this.taskRunLogs.filter((log) => log.taskId !== id);
+      this.persist();
+    },
+    addTaskRunLog(payload) {
+      this.taskRunLogs.unshift(payload);
+      this.persist();
+    },
+    updateTaskRunLog(id, patch) {
+      const log = this.taskRunLogs.find((item) => item.id === id);
+      if (!log) return;
+      Object.assign(log, patch);
+      this.persist();
+    },
+    clearTaskRunLogs() {
+      this.taskRunLogs = [];
       this.persist();
     },
     insertCardIntoCollection(collectionId, cardId, index) {
@@ -300,6 +367,18 @@ export const useDataStore = defineStore('data', {
         step.stdout += chunk;
       } else {
         step.stderr += chunk;
+      }
+      this.persist();
+    },
+    clearCollectionRunLogs(collectionId = null) {
+      const clearAllCollections = !collectionId;
+      this.runLogs = this.runLogs.filter((run) => {
+        if (run.targetType !== 'collection') return true;
+        if (clearAllCollections) return false;
+        return run.targetId !== collectionId;
+      });
+      if (this.activeRunId && !this.runLogs.some((run) => run.id === this.activeRunId)) {
+        this.activeRunId = null;
       }
       this.persist();
     }

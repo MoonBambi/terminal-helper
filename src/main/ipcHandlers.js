@@ -337,7 +337,7 @@ function registerIpcHandlers() {
     const endedAt = new Date().toISOString();
     sendToRenderer(event, 'run:end', { runId, status, endedAt });
 
-    return { runId };
+    return { runId, status };
   });
 
   ipcMain.handle('run:collection', async (event, payload) => {
@@ -432,6 +432,10 @@ function registerIpcHandlers() {
 
     session.on('close', () => {
       if (currentStep) {
+        if (stdoutTail) {
+          emitStdout(stdoutTail);
+          stdoutTail = '';
+        }
         const endedAt = new Date().toISOString();
         const stopped = runState.canceled;
         sendToRenderer(event, 'run:step-end', {
@@ -485,7 +489,7 @@ function registerIpcHandlers() {
     sendToRenderer(event, 'run:end', { runId, status, endedAt });
     activeCollections.delete(collection.id);
     activeRuns.delete(runId);
-    return { runId };
+    return { runId, status };
   });
 
   ipcMain.handle('run:stop', async (event, runId, options) => {
@@ -509,15 +513,18 @@ function registerIpcHandlers() {
       const incomingStopAction = options && typeof options === 'object' ? options.stopAction : null;
       const stopAction = normalizeStopAction(incomingStopAction || runState.stopAction, runState.shell);
       try {
+        if (session && !session.killed) {
+          try {
+            session.stdin.write('\u0003');
+          } catch (err) {
+            // ignore
+          }
+          await waitMs(120);
+        }
         if (stopAction.command) {
           if (stopAction.useDedicatedTerminal) {
             spawnForShell(stopAction.command, stopAction.shell || runState.shell);
           } else if (session && !session.killed) {
-            try {
-              session.stdin.write('\u0003');
-            } catch (err) {
-              // ignore
-            }
             writeSessionCommand(session, runState.shell, stopAction.command);
             await waitMs(200);
           }

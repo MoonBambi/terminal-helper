@@ -5,6 +5,8 @@ const path = require('path');
 const defaults = {
   cards: [],
   collections: [],
+  tasks: [],
+  taskRunLogs: [],
   runLogs: [],
   settings: {
     shellPaths: {
@@ -66,6 +68,8 @@ function normalize(data) {
   return {
     cards: Array.isArray(data?.cards) ? data.cards : [],
     collections: Array.isArray(data?.collections) ? data.collections : [],
+    tasks: Array.isArray(data?.tasks) ? data.tasks : [],
+    taskRunLogs: Array.isArray(data?.taskRunLogs) ? data.taskRunLogs : [],
     runLogs: Array.isArray(data?.runLogs) ? data.runLogs : [],
     settings: data?.settings || defaults.settings
   };

@@ -590,6 +590,85 @@ textarea.input {
   position: relative;
 }
 
+.task-row {
+  position: relative;
+  overflow: visible;
+  border: none;
+  background: #f8fafc;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.task-row:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+.task-row-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: width 0.3s ease;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.task-row.task-row-status-running .task-row-progress {
+  background: rgba(99, 102, 241, 0.16);
+}
+
+.task-row.task-row-status-success .task-row-progress {
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.task-row.task-row-status-failed .task-row-progress,
+.task-row.task-row-status-stopped .task-row-progress {
+  background: rgba(244, 63, 94, 0.14);
+}
+
+.task-row-content {
+  position: relative;
+  z-index: 1;
+}
+
+.task-complete-badges {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: flex;
+  width: min(62%, 320px);
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.task-complete-badge-item {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid #86efac;
+  background: #ecfdf3;
+  color: #047857;
+  box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: fabBounceStretch 0.6s ease-out both;
+}
+
+.task-complete-badge-item-error {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #be123c;
+  box-shadow: 0 10px 20px rgba(244, 63, 94, 0.2);
+}
+
 
 .command-ellipsis {
   max-height: 28px;
@@ -647,13 +726,42 @@ textarea.input {
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  padding: 2px 18px;
+  scrollbar-width: none;
 }
 
-.terminal-tabs-inline {
+.terminal-tabs::-webkit-scrollbar {
+  height: 0;
+}
+
+.terminal-tabs-strip {
+  position: relative;
   flex: 1;
-  justify-content: flex-start;
-  flex-wrap: wrap;
   min-width: 0;
+}
+
+.terminal-tabs-strip::before,
+.terminal-tabs-strip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.terminal-tabs-strip::before {
+  left: 0;
+  background: linear-gradient(to right, #e4e7ff 35%, rgba(228, 231, 255, 0));
+}
+
+.terminal-tabs-strip::after {
+  right: 0;
+  background: linear-gradient(to left, #e4e7ff 35%, rgba(228, 231, 255, 0));
 }
 
 .terminal-tab {
@@ -670,11 +778,13 @@ textarea.input {
   gap: 6px;
   min-width: 0;
   max-width: 320px;
+  flex: 0 0 auto;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .terminal-tab-label {
+  max-width: 5em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
