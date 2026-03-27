@@ -5,6 +5,8 @@
 :root {
   color-scheme: light;
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  --mica-bg: rgba(226, 234, 255, 0.24);
+  --mica-border-line: rgba(168, 190, 245, 0.95);
 }
 
 html,
@@ -253,11 +255,25 @@ body {
 .titlebar {
   -webkit-app-region: drag;
   height: 36px;
-  background: #ffffff;
+  background-color: var(--mica-bg);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0 8px;
+}
+
+.sidebar {
+  background-color: var(--mica-bg);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+}
+
+.terminal-shell {
+  background-color: var(--mica-bg);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
 }
 
 .titlebar-btn {
@@ -328,6 +344,14 @@ textarea.input {
 .main-divider {
   position: relative;
   --corner-radius: 24px;
+  background-image: radial-gradient(
+    circle at var(--corner-radius) var(--corner-radius),
+    transparent calc(var(--corner-radius) - 1px),
+    var(--mica-bg) var(--corner-radius)
+  );
+  background-size: var(--corner-radius) var(--corner-radius);
+  background-repeat: no-repeat;
+  background-position: top left;
 }
 
 .main-divider::before {
@@ -337,10 +361,11 @@ textarea.input {
   left: 0;
   right: 0;
   height: var(--corner-radius);
-  border-top: 1px solid #e2e8f0;
-  border-left: 1px solid #e2e8f0;
+  border-top: 1px solid var(--mica-border-line);
+  border-left: 1px solid var(--mica-border-line);
   border-top-left-radius: var(--corner-radius);
   pointer-events: none;
+  background: none;
 }
 
 .main-divider::after {
@@ -350,8 +375,13 @@ textarea.input {
   left: 0;
   bottom: 0;
   width: 1px;
-  background: #e2e8f0;
+  background: var(--mica-border-line);
   pointer-events: none;
+}
+
+.main-divider::before,
+.main-divider::after {
+  box-shadow: none;
 }
 
 .search-shell {
@@ -605,4 +635,114 @@ textarea.input {
   background: transparent;
   border: none;
   outline: none;
+}
+
+.terminal-panel {
+  background: #e4e7ff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.terminal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-tabs-inline {
+  flex: 1;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.terminal-tab {
+  height: 30px;
+  padding: 0 8px 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.58);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 320px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.terminal-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-tab-close {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  opacity: 0.72;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.terminal-tab-close:hover {
+  opacity: 1;
+  background: rgba(100, 116, 139, 0.18);
+}
+
+.terminal-tab:hover {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(99, 102, 241, 0.42);
+  color: #4338ca;
+}
+
+.terminal-tab.active {
+  background: rgba(224, 231, 255, 0.9);
+  border-color: rgba(99, 102, 241, 0.68);
+  color: #3730a3;
+}
+
+.terminal-stack {
+  position: relative;
+}
+
+.terminal-fab-group {
+  left: 24px;
+  right: auto;
+  bottom: 24px;
+}
+
+.terminal-outer {
+  background: #e4e7ff;
+  border-top-left-radius: 24px;
+}
+
+.terminal-outer.main-divider {
+  background-image: radial-gradient(
+    circle at var(--corner-radius) var(--corner-radius),
+    transparent calc(var(--corner-radius) - 1px),
+    var(--mica-bg) var(--corner-radius)
+  );
+}
+
+.terminal-container {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+.terminal-container,
+.terminal-container .xterm-viewport,
+.terminal-container .xterm-screen {
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }

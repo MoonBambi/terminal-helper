@@ -1,5 +1,6 @@
 const { ipcMain, dialog, BrowserWindow, app } = require('electron');
 const { spawn, spawnSync } = require('child_process');
+const pty = require('node-pty');
 const fs = require('fs');
 const path = require('path');
 const store = require('./store');
@@ -7,6 +8,7 @@ const iconv = require('iconv-lite');
 
 const activeCollections = new Set();
 const activeRuns = new Map();
+const activeTerminals = new Map();
 
 function sendToRenderer(event, channel, payload) {
   event.sender.send(channel, payload);
@@ -193,6 +195,19 @@ function closeSession(child, shell) {
   } catch (err) {
     // ignore
   }
+}
+
+function resolvePtyCommand(shell) {
+  const paths = getShellPaths();
+  const normalized = (shell || 'cmd').toLowerCase();
+  if (process.platform === 'win32') {
+    if (normalized === 'ps') return { file: paths.ps, args: ['-NoLogo'] };
+    if (normalized === 'bash') return { file: paths.bash, args: [] };
+    return { file: paths.cmd, args: [] };
+  }
+  if (normalized === 'ps') return { file: paths.ps || 'pwsh', args: ['-NoLogo'] };
+  if (normalized === 'bash') return { file: paths.bash || 'bash', args: [] };
+  return { file: process.env.SHELL || 'sh', args: [] };
 }
 
 function runCommand(event, card, runId, stepId) {
@@ -520,6 +535,79 @@ function registerIpcHandlers() {
       return { ok: true };
     }
     return { ok: false, error: 'Unknown run type' };
+  });
+
+  ipcMain.handle('terminal:create', (event, options) => {
+    const cols = Number(options && options.cols) || 80;
+    const rows = Number(options && options.rows) || 24;
+    const shell = options && options.shell ? options.shell : 'cmd';
+    const cwd = app.getPath('home') || process.env.USERPROFILE || process.env.HOME || process.cwd();
+    const { file, args } = resolvePtyCommand(shell);
+    const ptyProcess = pty.spawn(file, args, {
+      name: 'xterm-color',
+      cols,
+      rows,
+      cwd,
+      env: process.env
+    });
+    const id = `term_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    activeTerminals.set(id, { pty: ptyProcess, sender: event.sender });
+    ptyProcess.onData((data) => {
+      try {
+        event.sender.send('terminal:data', { id, data });
+      } catch (err) {
+        // ignore
+      }
+    });
+    ptyProcess.onExit(() => {
+      try {
+        event.sender.send('terminal:exit', { id });
+      } catch (err) {
+        // ignore
+      }
+      activeTerminals.delete(id);
+    });
+    return { ok: true, id };
+  });
+
+  ipcMain.handle('terminal:write', (event, payload) => {
+    const id = payload && payload.id;
+    const data = payload && payload.data;
+    const session = id ? activeTerminals.get(id) : null;
+    if (!session) return { ok: false, error: 'Not found' };
+    try {
+      session.pty.write(data);
+    } catch (err) {
+      return { ok: false, error: 'Write failed' };
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle('terminal:resize', (event, payload) => {
+    const id = payload && payload.id;
+    const cols = Number(payload && payload.cols);
+    const rows = Number(payload && payload.rows);
+    const session = id ? activeTerminals.get(id) : null;
+    if (!session) return { ok: false, error: 'Not found' };
+    if (!Number.isFinite(cols) || !Number.isFinite(rows)) return { ok: false, error: 'Invalid size' };
+    try {
+      session.pty.resize(cols, rows);
+    } catch (err) {
+      return { ok: false, error: 'Resize failed' };
+    }
+    return { ok: true };
+  });
+
+  ipcMain.handle('terminal:close', (event, id) => {
+    const session = id ? activeTerminals.get(id) : null;
+    if (!session) return { ok: false, error: 'Not found' };
+    try {
+      session.pty.kill();
+    } catch (err) {
+      // ignore
+    }
+    activeTerminals.delete(id);
+    return { ok: true };
   });
 
   ipcMain.handle('window:minimize', (event) => {

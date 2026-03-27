@@ -12,7 +12,7 @@
       </button>
     </div>
     <div class="grid grid-cols-[240px_1fr] h-[calc(100vh-36px)] bg-white overflow-hidden">
-      <aside class="bg-white px-4 py-6 h-full min-h-0 flex flex-col overflow-hidden">
+      <aside class="sidebar px-4 py-6 h-full min-h-0 flex flex-col overflow-hidden">
         <div class="mb-6 flex items-center gap-2">
           <div class="h-8 w-8 rounded-xl bg-indigo-600/10 border border-indigo-600/20"></div>
           <div>
@@ -34,6 +34,14 @@
             @click="activePage = 'collections'"
           >
             集合管理
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
+            :class="activePage === 'terminal' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
+            @click="activePage = 'terminal'"
+          >
+            <TerminalIcon class="h-4 w-4" />
+            终端
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
@@ -66,8 +74,11 @@
         </div>
       </aside>
 
-      <div class="flex flex-col h-full min-h-0">
-        <div class="px-6 py-4 flex-1 overflow-hidden min-h-0 main-divider">
+      <div class="flex flex-col h-full min-h-0" :class="activePage === 'terminal' ? 'terminal-shell' : ''">
+        <div
+          class="flex-1 overflow-hidden min-h-0 main-divider"
+          :class="activePage === 'terminal' ? 'px-0 py-0 terminal-outer' : 'px-6 py-4'"
+        >
           <main v-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
             <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10">
               <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px] shadow-sm search-shell">
@@ -187,38 +198,40 @@
                   <button class="icon-btn" @click="logCollapsed = !logCollapsed" title="折叠/展开">
                     <ChevronDownIcon class="h-4 w-4 transition-transform" :class="logCollapsed ? '-rotate-90' : ''" />
                   </button>
-                  <h2 class="text-sm font-semibold text-slate-700">日志面板</h2>
+                  <h2 class="text-sm font-semibold text-slate-700">历史运行记录</h2>
                 </div>
-                <span class="text-xs text-slate-500">{{ activeRun ? formatDuration(activeRun.startedAt, activeRun.endedAt) : '-' }}</span>
+                <span class="text-xs text-slate-500">{{ collectionHistoryLogs.length }} 条</span>
               </div>
-              <div v-if="activeRun && !logCollapsed" class="space-y-3">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-sm font-medium text-slate-700">{{ activeRun.targetName }}</p>
-                    <p class="text-xs text-slate-500">{{ activeRun.targetType.toUpperCase() }}</p>
-                  </div>
-                  <span
-                    class="text-xs"
-                    :class="
-                      activeRun.status === 'failed' || activeRun.status === 'stopped'
-                        ? 'text-rose-600'
-                        : activeRun.status === 'success'
-                        ? 'text-emerald-600'
-                        : 'text-indigo-600'
-                    "
-                  >
-                    {{ activeRun.status }}
-                  </span>
-                </div>
-                <div class="log-box rounded-lg p-3 max-h-[320px] overflow-auto">
-                  <template v-if="activeRun.steps.length">
-                    <div v-for="step in activeRun.steps" :key="step.id" class="space-y-2">
-                      <p class="text-[11px] text-slate-500">{{ step.command }}</p>
-                      <pre class="text-[11px] text-slate-700 whitespace-pre-wrap font-mono">{{ step.stdout }}</pre>
-                      <pre v-if="step.stderr" class="text-[11px] text-rose-600 whitespace-pre-wrap font-mono">{{ step.stderr }}</pre>
+              <div v-if="!logCollapsed" class="space-y-3">
+                <div class="log-box rounded-lg p-3 max-h-[320px] overflow-auto space-y-3">
+                  <template v-if="collectionHistoryLogs.length">
+                    <div
+                      v-for="run in collectionHistoryLogs"
+                      :key="run.id"
+                      class="rounded-lg border border-slate-200 bg-white/70 px-3 py-2 space-y-1"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-sm font-medium text-slate-700 truncate">{{ run.targetName }}</p>
+                        <span
+                          class="text-xs"
+                          :class="
+                            run.status === 'failed' || run.status === 'stopped'
+                              ? 'text-rose-600'
+                              : run.status === 'success'
+                              ? 'text-emerald-600'
+                              : 'text-indigo-600'
+                          "
+                        >
+                          {{ run.status }}
+                        </span>
+                      </div>
+                      <p class="text-[11px] text-slate-500">开始：{{ formatDate(run.startedAt) }}</p>
+                      <p class="text-[11px] text-slate-500">
+                        结束：{{ run.endedAt ? formatDate(run.endedAt) : '运行中' }} · 耗时：{{ formatDuration(run.startedAt, run.endedAt) }}
+                      </p>
                     </div>
                   </template>
-                  <p v-else class="text-[11px] text-slate-500">暂无输出</p>
+                  <p v-else class="text-[11px] text-slate-500">暂无历史运行记录</p>
                 </div>
               </div>
             </section>
@@ -334,7 +347,59 @@
               </button>
             </div>
           </main>
-          <main v-else class="space-y-4 h-full flex flex-col min-h-0">
+          <main v-show="activePage === 'terminal'" class="space-y-4 h-full flex flex-col min-h-0 terminal-panel pt-8 pl-8 pr-4 pb-4">
+            <div class="flex items-start justify-between mb-3 gap-4">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-700">终端</h3>
+                <p class="text-xs text-slate-400">内嵌终端会话</p>
+              </div>
+              <div v-if="terminalTabs.length" class="terminal-tabs terminal-tabs-inline">
+                <div
+                  v-for="tab in terminalTabs"
+                  :key="tab.id"
+                  class="terminal-tab"
+                  :class="activeTerminalTabId === tab.id ? 'active' : ''"
+                  @click="switchTerminalTab(tab.id)"
+                >
+                  <span class="terminal-tab-label">{{ tab.label }}</span>
+                  <button type="button" class="terminal-tab-close" title="关闭终端标签" @click.stop="closeTerminalTab(tab.id)">
+                    <CloseIcon class="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-if="terminalTabs.length" class="terminal-stack flex-1 min-h-0">
+              <div
+                v-for="tab in terminalTabs"
+                :key="`terminal-pane-${tab.id}`"
+                v-show="activeTerminalTabId === tab.id"
+                :ref="(el) => setTerminalContainerRef(tab.id, el)"
+                class="terminal-container flex-1 min-h-0"
+              ></div>
+            </div>
+            <div v-else class="terminal-empty flex-1 min-h-0">
+              <p class="text-sm text-slate-500">暂无终端会话，运行集合后将自动创建。</p>
+            </div>
+            <div class="fab-group terminal-fab-group" :key="`fab-terminal-${activePage}-${fabAnimKey}`">
+              <button
+                class="fab fab-bounce"
+                :class="activeTerminalTabId ? '' : 'opacity-40 pointer-events-none'"
+                @click="clearActiveTerminalConnection"
+                title="清除连接"
+              >
+                <BroomIcon class="h-5 w-5" />
+              </button>
+              <button
+                class="fab fab-danger fab-bounce"
+                :class="isRunActive ? '' : 'opacity-40 pointer-events-none'"
+                @click="stopActiveRun"
+                title="停止运行"
+              >
+                <SquareIcon class="h-5 w-5" />
+              </button>
+            </div>
+          </main>
+          <main v-if="activePage === 'settings'" class="space-y-4 h-full flex flex-col min-h-0">
             <div class="rounded-xl p-4 space-y-4 w-full flex-1 overflow-auto min-h-0 scroll-fade">
               <div>
                 <h3 class="text-sm font-semibold text-slate-700">终端路径</h3>
@@ -546,7 +611,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue';
+import { Terminal as XTerm } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import 'xterm/css/xterm.css';
 import {
   Play,
   Pencil,
@@ -563,7 +631,9 @@ import {
   Square,
   X,
   Circle,
-  CheckCircle2
+  CheckCircle2,
+  Terminal,
+  BrushCleaning
 } from 'lucide-vue-next';
 import { useDataStore } from './modules/terminal/terminalStore';
 
@@ -584,6 +654,8 @@ const SquareIcon = Square;
 const CloseIcon = X;
 const CircleIcon = Circle;
 const CheckCircleIcon = CheckCircle2;
+const TerminalIcon = Terminal;
+const BroomIcon = BrushCleaning;
 
 const store = useDataStore();
 const activePage = ref('cards');
@@ -597,6 +669,13 @@ const editingOrderId = ref(null);
 const orderInputValue = ref('');
 const orderInputRefs = new Map();
 const collectionSearchQuery = ref('');
+const terminalTabs = ref([]);
+const terminalTabSeed = ref(0);
+const activeTerminalTabId = ref('');
+const terminalContainerRefs = new Map();
+const terminalStates = new Map();
+const collectionRunTabByRunId = new Map();
+const pendingCollectionRunTab = ref(null);
 
 const cardModal = reactive({
   open: false,
@@ -628,6 +707,12 @@ const confirmModal = reactive({
 
 const activeRun = computed(() => store.runLogs.find((r) => r.id === store.activeRunId));
 const isRunActive = computed(() => activeRun.value && activeRun.value.status === 'running');
+const collectionHistoryLogs = computed(() => {
+  const selectedCollectionId = store.selectedCollectionId;
+  const logs = store.runLogs.filter((run) => run.targetType === 'collection');
+  if (!selectedCollectionId) return logs;
+  return logs.filter((run) => run.targetId === selectedCollectionId);
+});
 const selectedCount = computed(() => selectedForCollection.value.length);
 const selectedCollectionCount = computed(() => selectedCollections.value.length);
 const isCollectionView = computed(() => Boolean(store.selectedCollectionId));
@@ -703,6 +788,273 @@ function formatDuration(startedAt, endedAt) {
   const minutes = Math.floor(diff / 60000);
   const ms = diff % 60000;
   return `${minutes}m ${ms}ms`;
+}
+
+function setTerminalContainerRef(tabId, el) {
+  if (!el) {
+    terminalContainerRefs.delete(tabId);
+    return;
+  }
+  terminalContainerRefs.set(tabId, el);
+}
+
+function switchTerminalTab(tabId) {
+  activeTerminalTabId.value = tabId;
+}
+
+async function closeTerminalTab(tabId) {
+  if (!tabId) return;
+  const index = terminalTabs.value.findIndex((tab) => tab.id === tabId);
+  if (index < 0) return;
+  for (const [runId, mappedTabId] of collectionRunTabByRunId.entries()) {
+    if (mappedTabId === tabId) {
+      collectionRunTabByRunId.delete(runId);
+    }
+  }
+  if (pendingCollectionRunTab.value === tabId) {
+    pendingCollectionRunTab.value = null;
+  }
+  const wasActive = activeTerminalTabId.value === tabId;
+  destroyTerminalTab(tabId);
+  terminalContainerRefs.delete(tabId);
+  terminalTabs.value.splice(index, 1);
+  if (!wasActive) return;
+  const nextTab = terminalTabs.value[index] || terminalTabs.value[index - 1] || null;
+  activeTerminalTabId.value = nextTab ? nextTab.id : '';
+}
+
+function getTerminalState(tabId) {
+  if (!terminalStates.has(tabId)) {
+    terminalStates.set(tabId, {
+      instance: null,
+      fitAddon: null,
+      sessionId: null,
+      disposers: [],
+      shell: 'cmd'
+    });
+  }
+  return terminalStates.get(tabId);
+}
+
+function shellLabel(shell) {
+  if (shell === 'ps') return 'PS';
+  if (shell === 'bash') return 'BASH';
+  return 'CMD';
+}
+
+function findTerminalTab(tabId) {
+  return terminalTabs.value.find((tab) => tab.id === tabId) || null;
+}
+
+function createCollectionTerminalTab(shell, collectionName) {
+  terminalTabSeed.value += 1;
+  const id = `term-${terminalTabSeed.value}`;
+  const label = `${shellLabel(shell)} ${collectionName}`;
+  terminalTabs.value.push({ id, label, shell: shell || 'cmd', mode: 'run' });
+  return id;
+}
+
+function getTerminalTheme() {
+  return {
+    foreground: '#657B83',
+    background: '#00000000',
+    cursor: '#002B36',
+    selection: '#2C4D57',
+    black: '#002B36',
+    red: '#DC322F',
+    green: '#586E75',
+    yellow: '#657B83',
+    blue: '#839496',
+    magenta: '#D33682',
+    cyan: '#93A1A1',
+    white: '#FDF6E3',
+    brightBlack: '#073642',
+    brightRed: '#CB4B16',
+    brightGreen: '#859900',
+    brightYellow: '#B58900',
+    brightBlue: '#268BD2',
+    brightMagenta: '#6C71C4',
+    brightCyan: '#2AA198',
+    brightWhite: '#EEE8D5'
+  };
+}
+
+async function ensureTerminalTab(tabId, preferredShell = 'cmd', options = {}) {
+  if (!tabId) return null;
+  const container = terminalContainerRefs.get(tabId);
+  const state = getTerminalState(tabId);
+  const tab = findTerminalTab(tabId);
+  const isRunTab = tab?.mode === 'run';
+  const interactive = options && options.interactive === true;
+  const shouldCreateSession = interactive || !isRunTab;
+  const desiredShell = preferredShell || tab?.shell || 'cmd';
+  if (!container || !state) return null;
+  if (!state.instance) {
+    state.instance = new XTerm({
+      allowTransparency: true,
+      convertEol: true,
+      cursorBlink: true,
+      disableStdin: !shouldCreateSession,
+      fontSize: 18,
+      fontFamily:
+        '"Cascadia Mono", "Microsoft YaHei", "Segoe UI", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      theme: getTerminalTheme()
+    });
+    state.fitAddon = new FitAddon();
+    state.instance.loadAddon(state.fitAddon);
+    state.instance.open(container);
+    state.instance.onData((data) => {
+      if (state.sessionId) {
+        window.terminalHelper.terminalWrite(state.sessionId, data);
+      }
+    });
+    state.instance.onResize(({ cols, rows }) => {
+      if (state.sessionId) {
+        window.terminalHelper.terminalResize(state.sessionId, cols, rows);
+      }
+    });
+    const offData = window.terminalHelper.onTerminalData((payload) => {
+      if (payload && payload.id === state.sessionId && state.instance) {
+        state.instance.write(payload.data);
+      }
+    });
+    const offExit = window.terminalHelper.onTerminalExit((payload) => {
+      if (payload && payload.id === state.sessionId && state.instance) {
+        state.sessionId = null;
+        state.instance.options.disableStdin = true;
+        state.instance.write('\r\n[Session Ended]\r\n');
+      }
+    });
+    state.disposers = [offData, offExit];
+  }
+  if (state.fitAddon) {
+    state.fitAddon.fit();
+  }
+  if (state.instance) {
+    state.instance.options.disableStdin = !shouldCreateSession;
+  }
+  if (state.sessionId && state.shell !== desiredShell) {
+    await window.terminalHelper.terminalClose(state.sessionId);
+    state.sessionId = null;
+    if (state.instance && !isRunTab) {
+      state.instance.write('\x1bc');
+    }
+  }
+  if (shouldCreateSession && !state.sessionId) {
+    const result = await window.terminalHelper.terminalCreate({
+      cols: state.instance.cols,
+      rows: state.instance.rows,
+      shell: desiredShell
+    });
+    if (!result || !result.ok) {
+      showToast('终端启动失败', 'error');
+      return null;
+    }
+    state.sessionId = result.id;
+    state.shell = desiredShell;
+    if (tab) {
+      tab.shell = desiredShell;
+    }
+    if (state.instance) {
+      state.instance.options.disableStdin = false;
+      state.instance.focus();
+    }
+  }
+  if (!shouldCreateSession && state.instance) {
+    state.instance.options.disableStdin = true;
+  }
+  return state;
+}
+
+function setTerminalInputEnabled(tabId, enabled) {
+  if (!tabId) return;
+  const state = terminalStates.get(tabId);
+  if (!state || !state.instance) return;
+  state.instance.options.disableStdin = !enabled;
+  if (enabled) {
+    state.instance.focus();
+  }
+}
+
+function getCollectionPreferredShell(collectionId) {
+  const collection = store.collections.find((c) => c.id === collectionId);
+  if (!collection) return 'cmd';
+  const firstCardId = collection.cardIds.find((id) => store.cards.some((card) => card.id === id));
+  if (!firstCardId) return 'cmd';
+  const firstCard = store.cards.find((card) => card.id === firstCardId);
+  return firstCard?.shell || 'cmd';
+}
+
+function resizeTerminalTab(tabId) {
+  if (!tabId) return;
+  const state = getTerminalState(tabId);
+  if (!state || !state.instance || !state.fitAddon) return;
+  state.fitAddon.fit();
+  if (state.sessionId) {
+    window.terminalHelper.terminalResize(state.sessionId, state.instance.cols, state.instance.rows);
+  }
+}
+
+function resizeTerminal() {
+  if (activePage.value !== 'terminal') return;
+  resizeTerminalTab(activeTerminalTabId.value);
+}
+
+function destroyTerminalTab(tabId) {
+  const state = getTerminalState(tabId);
+  if (!state) return;
+  if (state.disposers.length) {
+    state.disposers.forEach((dispose) => dispose && dispose());
+    state.disposers = [];
+  }
+  if (state.sessionId) {
+    window.terminalHelper.terminalClose(state.sessionId);
+    state.sessionId = null;
+  }
+  if (state.instance) {
+    state.instance.dispose();
+    state.instance = null;
+  }
+  state.fitAddon = null;
+  state.shell = 'cmd';
+  terminalStates.delete(tabId);
+}
+
+function destroyTerminal() {
+  collectionRunTabByRunId.clear();
+  pendingCollectionRunTab.value = null;
+  terminalTabs.value.forEach((tab) => destroyTerminalTab(tab.id));
+}
+
+function writeToTerminalTab(tabId, text) {
+  const state = getTerminalState(tabId);
+  if (!state || !state.instance || !text) return;
+  state.instance.write(text.replace(/\r?\n/g, '\r\n'));
+}
+
+function writeRunOutput(runId, text) {
+  const tabId = collectionRunTabByRunId.get(runId);
+  if (!tabId) return;
+  writeToTerminalTab(tabId, text);
+}
+
+async function clearActiveTerminalConnection() {
+  const tabId = activeTerminalTabId.value;
+  if (!tabId) return;
+  const state = terminalStates.get(tabId);
+  if (!state || !state.instance) return;
+  for (const [runId, mappedTabId] of collectionRunTabByRunId.entries()) {
+    if (mappedTabId === tabId) {
+      collectionRunTabByRunId.delete(runId);
+    }
+  }
+  if (state.sessionId) {
+    await window.terminalHelper.terminalClose(state.sessionId);
+    state.sessionId = null;
+  }
+  state.instance.options.disableStdin = true;
+  state.instance.write('\x1bc');
+  showToast('已清除连接', 'success');
 }
 
 function showToast(message, tone = 'info') {
@@ -1097,13 +1449,25 @@ async function stopActiveRun() {
 
 function runCollection(collection) {
   const cards = collection.cardIds.map((id) => store.cards.find((c) => c.id === id)).filter(Boolean);
+  if (!cards.length) {
+    showToast('集合没有可执行卡片', 'error');
+    return;
+  }
   confirmModal.title = '运行集合';
-  confirmModal.message = `即将按顺序执行集合「${collection.name}」`;
+  confirmModal.message = `即将在终端中展示并运行集合「${collection.name}」`;
   confirmModal.details = cards.map((c) => c.command).join('\n');
   confirmModal.confirmText = '确认执行';
   confirmModal.onConfirm = async () => {
     confirmModal.open = false;
-    await window.terminalHelper.runCollection(toPlain(collection), cards.map(toPlain));
+    const preferredShell = cards[0]?.shell || 'cmd';
+    const tabId = createCollectionTerminalTab(preferredShell, collection.name);
+    activeTerminalTabId.value = tabId;
+    activePage.value = 'terminal';
+    await nextTick();
+    const state = await ensureTerminalTab(tabId, preferredShell);
+    if (!state) return;
+    pendingCollectionRunTab.value = tabId;
+    window.terminalHelper.runCollection(toPlain(collection), cards.map(toPlain));
   };
   confirmModal.open = true;
 }
@@ -1190,9 +1554,32 @@ onMounted(async () => {
       if (value === 'settings') {
         syncSettingsForm();
       }
+      if (value === 'terminal') {
+        const tabId = activeTerminalTabId.value;
+        if (tabId) {
+          nextTick(() => {
+            const shell = findTerminalTab(tabId)?.shell || 'cmd';
+            ensureTerminalTab(tabId, shell);
+            resizeTerminalTab(tabId);
+          });
+        }
+      }
       fabAnimKey.value += 1;
     }
   );
+  watch(
+    () => activeTerminalTabId.value,
+    (value) => {
+      if (!value) return;
+      if (activePage.value !== 'terminal') return;
+      nextTick(() => {
+        const shell = findTerminalTab(value)?.shell || 'cmd';
+        ensureTerminalTab(value, shell);
+        resizeTerminalTab(value);
+      });
+    }
+  );
+  window.addEventListener('resize', resizeTerminal);
   window.terminalHelper.onRunBegin((payload) => {
     const targetName =
       payload.targetType === 'card'
@@ -1208,6 +1595,13 @@ onMounted(async () => {
       endedAt: null,
       steps: []
     });
+    if (payload.targetType === 'collection') {
+      const tabId = pendingCollectionRunTab.value || activeTerminalTabId.value;
+      collectionRunTabByRunId.set(payload.runId, tabId);
+      pendingCollectionRunTab.value = null;
+      setTerminalInputEnabled(tabId, false);
+      writeRunOutput(payload.runId, `\r\n=== 开始运行集合：${targetName} ===\r\n`);
+    }
   });
   window.terminalHelper.onRunStepBegin((payload) => {
     const card = store.cards.find((c) => c.id === payload.cardId);
@@ -1223,9 +1617,11 @@ onMounted(async () => {
       stdout: '',
       stderr: ''
     });
+    writeRunOutput(payload.runId, `\r\n$ ${payload.command}\r\n`);
   });
   window.terminalHelper.onRunLog((payload) => {
     store.appendRunOutput(payload.runId, payload.stepId, payload.stream, payload.chunk);
+    writeRunOutput(payload.runId, payload.chunk || '');
   });
   window.terminalHelper.onRunStepEnd((payload) => {
     store.updateRunStep(payload.runId, payload.stepId, {
@@ -1233,13 +1629,32 @@ onMounted(async () => {
       exitCode: payload.exitCode,
       endedAt: payload.endedAt
     });
+    const suffix = payload.status === 'success' ? 'OK' : payload.status === 'stopped' ? 'STOPPED' : 'FAILED';
+    writeRunOutput(payload.runId, `\r\n[${suffix}] exit=${payload.exitCode}\r\n`);
   });
-  window.terminalHelper.onRunEnd((payload) => {
+  window.terminalHelper.onRunEnd(async (payload) => {
+    const runLog = store.runLogs.find((r) => r.id === payload.runId) || null;
     store.updateRun(payload.runId, {
       status: payload.status,
       endedAt: payload.endedAt
     });
+    writeRunOutput(payload.runId, `\r\n=== 集合结束：${payload.status} ===\r\n`);
+    const tabId = collectionRunTabByRunId.get(payload.runId);
+    if (runLog && runLog.targetType === 'collection' && tabId) {
+      const shell = getCollectionPreferredShell(runLog.targetId);
+      const state = await ensureTerminalTab(tabId, shell, { interactive: true });
+      if (state && state.instance) {
+        state.instance.write('\r\n');
+        setTerminalInputEnabled(tabId, true);
+      }
+    }
+    collectionRunTabByRunId.delete(payload.runId);
   });
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeTerminal);
+  destroyTerminal();
 });
 </script>
 

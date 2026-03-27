@@ -12,6 +12,20 @@ contextBridge.exposeInMainWorld('terminalHelper', {
   runCard: (card) => ipcRenderer.invoke('run:card', card),
   runCollection: (collection, cards) => ipcRenderer.invoke('run:collection', { collection, cards }),
   stopRun: (runId, options) => ipcRenderer.invoke('run:stop', runId, options),
+  terminalCreate: (options) => ipcRenderer.invoke('terminal:create', options),
+  terminalWrite: (id, data) => ipcRenderer.invoke('terminal:write', { id, data }),
+  terminalResize: (id, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, cols, rows }),
+  terminalClose: (id) => ipcRenderer.invoke('terminal:close', id),
+  onTerminalData: (callback) => {
+    const listener = (_, payload) => callback(payload);
+    ipcRenderer.on('terminal:data', listener);
+    return () => ipcRenderer.removeListener('terminal:data', listener);
+  },
+  onTerminalExit: (callback) => {
+    const listener = (_, payload) => callback(payload);
+    ipcRenderer.on('terminal:exit', listener);
+    return () => ipcRenderer.removeListener('terminal:exit', listener);
+  },
   windowMinimize: () => ipcRenderer.invoke('window:minimize'),
   windowToggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
   windowClose: () => ipcRenderer.invoke('window:close'),
