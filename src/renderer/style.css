@@ -133,20 +133,49 @@ body {
 }
 
 .fab {
-  @apply h-12 w-12 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg hover:bg-slate-800 transition;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.2s ease;
+  @apply h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.2s ease, color 0.2s ease;
+  --fab-bg: #f8fafc;
+  --fab-bg-hover: #f1f5f9;
+  --fab-border: #e2e8f0;
+  --fab-ink: #0f172a;
+  background-color: var(--fab-bg);
+  border: 1px solid var(--fab-border);
+  color: var(--fab-ink);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.fab:hover {
+  background-color: var(--fab-bg-hover);
+  border-color: var(--fab-border-hover, var(--fab-border));
+  color: var(--fab-ink-hover, var(--fab-ink));
 }
 
 .fab-alt {
-  @apply bg-indigo-600 hover:bg-indigo-500;
+  --fab-bg: #eef2ff;
+  --fab-bg-hover: #e0e7ff;
+  --fab-border: #c7d2fe;
+  --fab-border-hover: #a5b4fc;
+  --fab-ink: #4338ca;
+  --fab-ink-hover: #3730a3;
 }
 
 .fab-play {
-  @apply bg-emerald-600 hover:bg-emerald-500;
+  --fab-bg: #ecfdf3;
+  --fab-bg-hover: #dcfce7;
+  --fab-border: #bbf7d0;
+  --fab-border-hover: #86efac;
+  --fab-ink: #047857;
+  --fab-ink-hover: #065f46;
 }
 
 .fab-danger {
-  @apply bg-rose-600 hover:bg-rose-500;
+  --fab-bg: #fff1f2;
+  --fab-bg-hover: #ffe4e6;
+  --fab-border: #fecdd3;
+  --fab-border-hover: #fda4af;
+  --fab-ink: #be123c;
+  --fab-ink-hover: #9f1239;
 }
 
 .fab:active {
