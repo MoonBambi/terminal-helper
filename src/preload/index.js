@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('terminalHelper', {
   exportDataCustom: (data) => ipcRenderer.invoke('data:export-custom', data),
   importData: () => ipcRenderer.invoke('data:import'),
   importDataRaw: () => ipcRenderer.invoke('data:import-raw'),
+  fetchBoardData: () => ipcRenderer.invoke('board:fetch-data'),
   detectShellPaths: () => ipcRenderer.invoke('settings:detect-shells'),
   validateShellPath: (path) => ipcRenderer.invoke('settings:validate-path', path),
   runCard: (card) => ipcRenderer.invoke('run:card', card),

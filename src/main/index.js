@@ -27,12 +27,20 @@ function createWindow() {
     }
   });
 
+  const distHtml = path.join(__dirname, '..', '..', 'dist', 'index.html');
   if (isDev) {
-    win.loadURL('http://localhost:5173');
-    win.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    win.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
+    win
+      .loadURL('http://localhost:5173')
+      .then(() => {
+        win.webContents.openDevTools({ mode: 'detach' });
+      })
+      .catch(() => {
+        // Fallback for running `npm run start` without a dev server.
+        win.loadFile(distHtml);
+      });
+    return;
   }
+  win.loadFile(distHtml);
 }
 
 app.whenReady().then(() => {

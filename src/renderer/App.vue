@@ -115,7 +115,86 @@
           class="flex-1 overflow-hidden min-h-0 main-divider"
           :class="activePage === 'terminal' ? 'px-0 py-0 terminal-outer' : 'px-6 py-4'"
         >
-          <main v-if="activePage === 'board'" class="h-full"></main>
+          <main v-if="activePage === 'board'" class="h-full min-h-0 overflow-auto pr-1 scroll-fade">
+            <div class="board-shell space-y-4 pb-6">
+              <section class="card-panel rounded-xl p-4 board-header">
+                <h3 class="text-sm font-semibold text-slate-700">土地流转舆情看板</h3>
+                <p class="text-xs text-slate-500 mt-1">基于新闻表与词频表的样式化分析视图（先行展示）</p>
+              </section>
+
+              <section class="grid grid-cols-12 gap-4">
+                <article class="card-panel rounded-xl p-4 col-span-4 board-card board-card-glass">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-slate-700">舆情“晴雨表”</h4>
+                    <span class="text-[11px] text-slate-500">{{ boardTotalNews }} 条</span>
+                  </div>
+                  <div ref="boardSentimentChartRef" class="mt-3 board-chart-host board-chart-host-sm"></div>
+                  <div class="space-y-2 flex-1 min-w-0 mt-2">
+                    <div v-for="item in boardSentimentDistribution" :key="item.key" class="flex items-center justify-between text-xs gap-2">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="board-legend-dot" :style="{ background: item.color }"></span>
+                        <span class="text-slate-600 truncate">{{ item.label }}</span>
+                      </div>
+                      <span class="text-slate-500">{{ item.count }} / {{ item.percent }}%</span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 mt-4">
+                    <div class="board-kpi">
+                      <p class="text-[11px] text-slate-500">平均情感得分</p>
+                      <p class="text-lg font-semibold text-slate-700">{{ boardAverageSentiment }}</p>
+                    </div>
+                    <div class="board-kpi">
+                      <p class="text-[11px] text-slate-500">极端情绪预警</p>
+                      <p class="text-lg font-semibold text-slate-700">{{ boardExtremeSentimentCount }}</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card-panel rounded-xl p-4 col-span-8 board-card board-card-glass">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-slate-700">情感走势“心跳图”</h4>
+                    <span class="text-[11px] text-slate-500">按月聚合</span>
+                  </div>
+                  <div ref="boardTrendChartRef" class="mt-3 board-chart-host board-chart-host-lg"></div>
+                  <div class="mt-2 flex items-center gap-4 text-[11px] text-slate-500">
+                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-green"></i> 平均情感分</span>
+                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-blue"></i> 新闻总量</span>
+                  </div>
+                </article>
+
+                <article class="card-panel rounded-xl p-4 col-span-6 board-card board-card-glass board-fixed-panel">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-slate-700">媒体“偏好阵地”</h4>
+                    <span class="text-[11px] text-slate-500">来源对比</span>
+                  </div>
+                  <div ref="boardSourceChartRef" class="mt-3 board-chart-host board-chart-host-md"></div>
+                  <div class="mt-3 flex items-center gap-3 text-[11px] text-slate-500">
+                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-green"></i> 正面</span>
+                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-yellow"></i> 中性</span>
+                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-red"></i> 负面</span>
+                  </div>
+                </article>
+
+                <article class="card-panel rounded-xl p-4 col-span-6 board-card board-card-cloud board-fixed-panel board-cloud-panel">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-slate-700">高频词“情绪色彩”</h4>
+                    <span class="text-[11px] text-slate-500">关键词与情感联动</span>
+                  </div>
+                  <div class="mt-3 board-cloud board-cloud-scroll">
+                    <span
+                      v-for="word in boardSentimentWordCloud"
+                      :key="word.word"
+                      class="board-cloud-word"
+                      :style="{ fontSize: `${word.size}px`, color: word.color, opacity: word.opacity }"
+                      :title="`${word.word} · ${word.count} 次 · ${word.sentiment.toFixed(3)}`"
+                    >
+                      {{ word.word }}
+                    </span>
+                  </div>
+                </article>
+              </section>
+            </div>
+          </main>
           <main v-else-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
             <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10">
               <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px] shadow-sm search-shell">
@@ -838,6 +917,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue';
+import * as echarts from 'echarts';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
@@ -912,9 +992,93 @@ const terminalContainerRefs = new Map();
 const terminalStates = new Map();
 const collectionRunTabByRunId = new Map();
 const pendingCollectionRunTab = ref(null);
+const boardSentimentChartRef = ref(null);
+const boardTrendChartRef = ref(null);
+const boardSourceChartRef = ref(null);
+let boardSentimentChart = null;
+let boardTrendChart = null;
+let boardSourceChart = null;
 
 function playLogoAnimation() {
   logoAnimSeed.value += 1;
+}
+
+const boardTone = Object.freeze({
+  positive: '#859900',
+  neutral: '#B58900',
+  negative: '#DC322F',
+  volume: '#268BD2'
+});
+
+const boardNewsFallback = [
+  { id: 1, publish_date: '2026-03-06', source: '川观新闻', sentiment_score: 0.92, keywords: ['土地流转', '经营权', '集体经济', '乡村振兴'] },
+  { id: 2, publish_date: '2025-12-17', source: '中国日报网', sentiment_score: 0.95, keywords: ['宅基地改革', '流转费', '农业增收'] },
+  { id: 3, publish_date: '2025-09-12', source: '鲁网', sentiment_score: 0.95, keywords: ['土地流转', '承包权', '经营权'] },
+  { id: 4, publish_date: '2025-09-04', source: '中国日报网', sentiment_score: 0.95, keywords: ['土地流转', '经营权', '集约化'] },
+  { id: 5, publish_date: '2025-08-01', source: '周口网', sentiment_score: 0.92, keywords: ['土地流转', '承包权', '农村合作社'] },
+  { id: 6, publish_date: '2025-05-22', source: '中国日报网', sentiment_score: 0.50, keywords: ['土地政策', '农村发展'] },
+  { id: 7, publish_date: '2025-04-11', source: '经济日报', sentiment_score: 0.92, keywords: ['土地流转', '经营权', '乡村振兴'] },
+  { id: 8, publish_date: '2025-03-20', source: '中国新闻网', sentiment_score: 0.75, keywords: ['土地流转', '承包权', '市场化'] },
+  { id: 9, publish_date: '2025-02-23', source: '新华社', sentiment_score: 0.95, keywords: ['承包权', '经营权', '集体产权'] },
+  { id: 10, publish_date: '2024-03-29', source: '中国日报网', sentiment_score: 0.95, keywords: ['土地流转', '经营权', '高标准农田'] },
+  { id: 11, publish_date: '2025-12-29', source: '中国日报网', sentiment_score: 0.95, keywords: ['公司制改制', '集体协同', '农业产业'] },
+  { id: 12, publish_date: '2025-12-29', source: '半岛网', sentiment_score: 0.95, keywords: ['土地流转', '经营权', '农业项目'] },
+  { id: 13, publish_date: '2025-12-23', source: '中国日报网', sentiment_score: 0.92, keywords: ['承包权', '经营权', '流转费'] },
+  { id: 14, publish_date: '2025-12-11', source: '中国日报网', sentiment_score: 0.95, keywords: ['土地确权证', '代养模式', '增收'] },
+  { id: 15, publish_date: '2025-10-25', source: '中国日报网', sentiment_score: 0.92, keywords: ['土地纠纷', '承包权', '流转规范'] },
+  { id: 16, publish_date: '2025-10-16', source: '半岛网', sentiment_score: 0.92, keywords: ['土地流转', '经营权', '农业现代化'] },
+  { id: 17, publish_date: '2025-10-11', source: '鲁网', sentiment_score: 0.92, keywords: ['承包权', '经营权', '流转费'] },
+  { id: 18, publish_date: '2025-10-11', source: '中国日报网', sentiment_score: 0.92, keywords: ['土地确权', '承包权', '流转费'] },
+  { id: 19, publish_date: '2025-09-30', source: '东方网', sentiment_score: 0.90, keywords: ['土地流转', '经营权', '承包权'] },
+  { id: 20, publish_date: '2025-09-23', source: '中国日报网', sentiment_score: 0.90, keywords: ['土地确权', '承包权', '流转费'] },
+  { id: 21, publish_date: '2026-01-15', source: '中国日报网', sentiment_score: 0.95, keywords: ['林权流转', '经营权', '集体经济'] },
+  { id: 22, publish_date: '2026-01-09', source: '光明网融媒频道', sentiment_score: 0.92, keywords: ['土地流转', '经营权', '承包权'] },
+  { id: 23, publish_date: '2025-12-02', source: '半岛网', sentiment_score: 0.95, keywords: ['承包权', '经营权', '流转费'] },
+  { id: 24, publish_date: '2025-11-04', source: '半岛网', sentiment_score: 0.50, keywords: ['土地纠纷', '确权争议', '基层治理'] },
+  { id: 25, publish_date: '2025-08-15', source: '鲁网', sentiment_score: 0.35, keywords: ['土地纠纷', '流转争议', '权益冲突'] },
+  { id: 26, publish_date: '2025-08-12', source: '日照新闻网', sentiment_score: 0.90, keywords: ['土地承包经营权', '经营权', '农户增收'] }
+];
+
+const boardWordFreqFallback = [
+  { word: '发展', count: 64070 },
+  { word: '农业', count: 53399 },
+  { word: '乡村', count: 41738 },
+  { word: '农村', count: 39500 },
+  { word: '建设', count: 38360 },
+  { word: '产业', count: 37155 },
+  { word: '种植', count: 24447 },
+  { word: '服务', count: 22584 },
+  { word: '提升', count: 22531 },
+  { word: '实现', count: 22330 },
+  { word: '振兴', count: 21203 },
+  { word: '推动', count: 20581 },
+  { word: '土地', count: 20071 },
+  { word: '企业', count: 18570 },
+  { word: '农民', count: 18296 },
+  { word: '创新', count: 17774 },
+  { word: '技术', count: 17581 },
+  { word: '生产', count: 16976 },
+  { word: '项目', count: 16670 },
+  { word: '改革', count: 15491 },
+  { word: '村民', count: 15207 },
+  { word: '中国', count: 14872 },
+  { word: '模式', count: 14098 },
+  { word: '科技', count: 13611 },
+  { word: '资源', count: 12887 },
+  { word: '农户', count: 12833 },
+  { word: '实施', count: 12768 }
+];
+
+const boardNewsData = ref([]);
+const boardWordFreqData = ref([]);
+const boardDataLoaded = ref(false);
+const boardNewsTable = computed(() => (boardDataLoaded.value ? boardNewsData.value : boardNewsFallback));
+const boardWordFreqTable = computed(() => (boardDataLoaded.value ? boardWordFreqData.value : boardWordFreqFallback));
+
+function boardSentimentKey(score) {
+  if (score > 0.6) return 'positive';
+  if (score >= 0.4) return 'neutral';
+  return 'negative';
 }
 
 const cardModal = reactive({
@@ -1006,6 +1170,105 @@ const isTaskHistoryClearDisabled = computed(() => {
   if (!taskHistoryLogs.value.length) return true;
   return taskHistoryLogs.value.some((log) => log && log.status === 'running');
 });
+const boardTotalNews = computed(() => boardNewsTable.value.length);
+const boardAverageSentiment = computed(() => {
+  if (!boardNewsTable.value.length) return '0.000';
+  const sum = boardNewsTable.value.reduce((acc, item) => acc + Number(item.sentiment_score || 0), 0);
+  return (sum / boardNewsTable.value.length).toFixed(3);
+});
+const boardExtremeSentimentCount = computed(() => {
+  return boardNewsTable.value.filter((item) => item.sentiment_score >= 0.9 || item.sentiment_score <= 0.2).length;
+});
+const boardSentimentDistribution = computed(() => {
+  const buckets = {
+    positive: { key: 'positive', label: '支持 (>0.6)', color: boardTone.positive, count: 0 },
+    neutral: { key: 'neutral', label: '观望 (0.4-0.6)', color: boardTone.neutral, count: 0 },
+    negative: { key: 'negative', label: '争议 (<0.4)', color: boardTone.negative, count: 0 }
+  };
+  boardNewsTable.value.forEach((item) => {
+    buckets[boardSentimentKey(item.sentiment_score)].count += 1;
+  });
+  return Object.values(buckets).map((item) => ({
+    ...item,
+    percent: boardTotalNews.value ? Math.round((item.count / boardTotalNews.value) * 100) : 0
+  }));
+});
+const boardTrendSeries = computed(() => {
+  const monthMap = new Map();
+  boardNewsTable.value.forEach((item) => {
+    const month = String(item.publish_date || '').slice(0, 7);
+    if (!month) return;
+    if (!monthMap.has(month)) {
+      monthMap.set(month, { key: month, scoreSum: 0, count: 0 });
+    }
+    const record = monthMap.get(month);
+    record.scoreSum += Number(item.sentiment_score || 0);
+    record.count += 1;
+  });
+  return [...monthMap.values()]
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((item) => ({
+      key: item.key,
+      label: item.key.slice(5).replace('-', '/'),
+      avgScore: item.count ? item.scoreSum / item.count : 0,
+      volume: item.count
+    }));
+});
+const boardSourceStacked = computed(() => {
+  const sourceMap = new Map();
+  boardNewsTable.value.forEach((item) => {
+    const source = item.source || '未知来源';
+    if (!sourceMap.has(source)) {
+      sourceMap.set(source, { source, positive: 0, neutral: 0, negative: 0, total: 0 });
+    }
+    const current = sourceMap.get(source);
+    current[boardSentimentKey(item.sentiment_score)] += 1;
+    current.total += 1;
+  });
+  return [...sourceMap.values()]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6)
+    .map((row) => ({
+      ...row,
+      positivePct: row.total ? Number(((row.positive / row.total) * 100).toFixed(1)) : 0,
+      neutralPct: row.total ? Number(((row.neutral / row.total) * 100).toFixed(1)) : 0,
+      negativePct: row.total ? Number(((row.negative / row.total) * 100).toFixed(1)) : 0
+    }));
+});
+const boardKeywordSentimentMap = computed(() => {
+  const map = new Map();
+  boardNewsTable.value.forEach((item) => {
+    const keywords = Array.isArray(item.keywords) ? item.keywords : [];
+    keywords.forEach((keyword) => {
+      if (!map.has(keyword)) {
+        map.set(keyword, []);
+      }
+      map.get(keyword).push(Number(item.sentiment_score || 0));
+    });
+  });
+  return map;
+});
+const boardSentimentWordCloud = computed(() => {
+  if (!boardWordFreqTable.value.length) return [];
+  const maxCount = Math.max(...boardWordFreqTable.value.map((item) => item.count));
+  const minCount = Math.min(...boardWordFreqTable.value.map((item) => item.count));
+  return boardWordFreqTable.value.map((item, index) => {
+    const sentimentList = boardKeywordSentimentMap.value.get(item.word) || [];
+    const sentiment = sentimentList.length
+      ? sentimentList.reduce((acc, value) => acc + value, 0) / sentimentList.length
+      : 0.5;
+    const band = boardSentimentKey(sentiment);
+    const color = band === 'positive' ? boardTone.positive : band === 'negative' ? boardTone.negative : boardTone.neutral;
+    const ratio = maxCount === minCount ? 1 : (item.count - minCount) / (maxCount - minCount);
+    return {
+      ...item,
+      sentiment,
+      color,
+      size: Number((13 + ratio * 15).toFixed(2)),
+      opacity: Number((0.66 + ((index % 5) * 0.08)).toFixed(2))
+    };
+  });
+});
 const filteredCollectionCards = computed(() => {
   const query = collectionModal.search.trim().toLowerCase();
   if (!query) return store.cards;
@@ -1072,6 +1335,204 @@ function formatDuration(startedAt, endedAt) {
   const minutes = Math.floor(diff / 60000);
   const ms = diff % 60000;
   return `${minutes}m ${ms}ms`;
+}
+
+async function loadBoardData() {
+  if (!window.terminalHelper || typeof window.terminalHelper.fetchBoardData !== 'function') return;
+  try {
+    const result = await window.terminalHelper.fetchBoardData();
+    if (!result || !result.ok) return;
+    boardNewsData.value = Array.isArray(result.news) ? result.news : [];
+    boardWordFreqData.value = Array.isArray(result.words) ? result.words : [];
+    boardDataLoaded.value = true;
+  } catch (error) {
+    // keep fallback mock data
+  }
+}
+
+function ensureBoardChart(domRef, instance) {
+  const dom = domRef.value;
+  if (!dom) return instance;
+  if (instance && instance.getDom() === dom) return instance;
+  if (instance) {
+    instance.dispose();
+  }
+  return echarts.init(dom, null, { renderer: 'canvas' });
+}
+
+function renderBoardCharts() {
+  if (activePage.value !== 'board') return;
+  boardSentimentChart = ensureBoardChart(boardSentimentChartRef, boardSentimentChart);
+  boardTrendChart = ensureBoardChart(boardTrendChartRef, boardTrendChart);
+  boardSourceChart = ensureBoardChart(boardSourceChartRef, boardSourceChart);
+  if (!boardSentimentChart || !boardTrendChart || !boardSourceChart) return;
+
+  const sentimentData = boardSentimentDistribution.value.map((item) => ({
+    name: item.label,
+    value: item.count,
+    itemStyle: { color: item.color }
+  }));
+  boardSentimentChart.setOption(
+    {
+      animationDuration: 520,
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(30, 41, 59, 0.92)',
+        borderColor: 'rgba(148, 163, 184, 0.35)',
+        textStyle: { color: '#e2e8f0', fontSize: 12 }
+      },
+      graphic: [
+        {
+          type: 'text',
+          left: 'center',
+          top: '42%',
+          style: { text: '均值', fill: '#64748b', fontSize: 12, fontWeight: 500 }
+        },
+        {
+          type: 'text',
+          left: 'center',
+          top: '52%',
+          style: { text: boardAverageSentiment.value, fill: '#334155', fontSize: 18, fontWeight: 700 }
+        }
+      ],
+      series: [
+        {
+          type: 'pie',
+          radius: ['58%', '82%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          data: sentimentData
+        }
+      ]
+    },
+    true
+  );
+
+  const trendSeries = boardTrendSeries.value;
+  boardTrendChart.setOption(
+    {
+      animationDuration: 540,
+      grid: { left: 48, right: 44, top: 20, bottom: 34 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'line' },
+        backgroundColor: 'rgba(30, 41, 59, 0.92)',
+        borderColor: 'rgba(148, 163, 184, 0.35)',
+        textStyle: { color: '#e2e8f0', fontSize: 12 }
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: trendSeries.map((item) => item.key),
+        axisLine: { lineStyle: { color: 'rgba(100, 116, 139, 0.45)' } },
+        axisLabel: { color: '#64748b', fontSize: 11 }
+      },
+      yAxis: [
+        {
+          type: 'value',
+          min: 0,
+          max: 1,
+          name: '情感',
+          nameTextStyle: { color: '#64748b', fontSize: 11, padding: [0, 0, 0, 6] },
+          splitLine: { lineStyle: { color: 'rgba(99, 102, 241, 0.14)' } },
+          axisLine: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11 }
+        },
+        {
+          type: 'value',
+          min: 0,
+          name: '热度',
+          nameTextStyle: { color: '#64748b', fontSize: 11, padding: [0, 6, 0, 0] },
+          splitLine: { show: false },
+          axisLine: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11 }
+        }
+      ],
+      series: [
+        {
+          name: '平均情感分',
+          type: 'line',
+          yAxisIndex: 0,
+          smooth: 0.38,
+          symbolSize: 6,
+          data: trendSeries.map((item) => Number(item.avgScore.toFixed(3))),
+          lineStyle: { width: 2.4, color: '#859900' },
+          itemStyle: { color: '#859900' },
+          areaStyle: { color: 'rgba(133, 153, 0, 0.2)' }
+        },
+        {
+          name: '新闻总量',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: 0.25,
+          symbolSize: 5,
+          data: trendSeries.map((item) => item.volume),
+          lineStyle: { width: 2, type: 'dashed', color: '#268BD2' },
+          itemStyle: { color: '#268BD2' }
+        }
+      ]
+    },
+    true
+  );
+
+  const sourceRows = boardSourceStacked.value;
+  boardSourceChart.setOption(
+    {
+      animationDuration: 520,
+      grid: { left: 96, right: 26, top: 16, bottom: 28 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        valueFormatter: (value) => `${value}%`,
+        backgroundColor: 'rgba(30, 41, 59, 0.92)',
+        borderColor: 'rgba(148, 163, 184, 0.35)',
+        textStyle: { color: '#e2e8f0', fontSize: 12 }
+      },
+      xAxis: {
+        type: 'value',
+        max: 100,
+        axisLine: { show: false },
+        splitLine: { lineStyle: { color: 'rgba(99, 102, 241, 0.12)' } },
+        axisLabel: { color: '#64748b', fontSize: 11, formatter: '{value}%' }
+      },
+      yAxis: {
+        type: 'category',
+        data: sourceRows.map((item) => item.source),
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: '#475569', fontSize: 11 }
+      },
+      series: [
+        { name: '正面', type: 'bar', stack: 'total', data: sourceRows.map((item) => item.positivePct), itemStyle: { color: '#859900' } },
+        { name: '中性', type: 'bar', stack: 'total', data: sourceRows.map((item) => item.neutralPct), itemStyle: { color: '#B58900' } },
+        { name: '负面', type: 'bar', stack: 'total', data: sourceRows.map((item) => item.negativePct), itemStyle: { color: '#DC322F' } }
+      ]
+    },
+    true
+  );
+}
+
+function resizeBoardCharts() {
+  if (boardSentimentChart) boardSentimentChart.resize();
+  if (boardTrendChart) boardTrendChart.resize();
+  if (boardSourceChart) boardSourceChart.resize();
+}
+
+function disposeBoardCharts() {
+  if (boardSentimentChart) {
+    boardSentimentChart.dispose();
+    boardSentimentChart = null;
+  }
+  if (boardTrendChart) {
+    boardTrendChart.dispose();
+    boardTrendChart = null;
+  }
+  if (boardSourceChart) {
+    boardSourceChart.dispose();
+    boardSourceChart = null;
+  }
 }
 
 function setTerminalContainerRef(tabId, el) {
@@ -2110,6 +2571,7 @@ async function importData() {
 
 onMounted(async () => {
   await store.load();
+  await loadBoardData();
   syncSettingsForm();
   windowMaximized.value = await window.terminalHelper.windowIsMaximized();
   const paths = store.settings?.shellPaths || {};
@@ -2131,6 +2593,12 @@ onMounted(async () => {
   watch(
     () => activePage.value,
     (value) => {
+      if (value === 'board') {
+        nextTick(() => {
+          renderBoardCharts();
+          resizeBoardCharts();
+        });
+      }
       if (value === 'settings') {
         syncSettingsForm();
       }
@@ -2151,6 +2619,16 @@ onMounted(async () => {
     }
   );
   watch(
+    [boardSentimentDistribution, boardTrendSeries, boardSourceStacked],
+    () => {
+      if (activePage.value !== 'board') return;
+      nextTick(() => {
+        renderBoardCharts();
+      });
+    },
+    { deep: true }
+  );
+  watch(
     () => activeTerminalTabId.value,
     (value) => {
       if (!value) return;
@@ -2163,6 +2641,10 @@ onMounted(async () => {
     }
   );
   window.addEventListener('resize', resizeTerminal);
+  window.addEventListener('resize', resizeBoardCharts);
+  nextTick(() => {
+    renderBoardCharts();
+  });
   window.terminalHelper.onRunBegin((payload) => {
     const targetName =
       payload.targetType === 'card'
@@ -2237,6 +2719,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resizeTerminal);
+  window.removeEventListener('resize', resizeBoardCharts);
+  disposeBoardCharts();
   destroyTerminal();
 });
 </script>

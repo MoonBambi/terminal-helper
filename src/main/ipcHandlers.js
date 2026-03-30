@@ -3,12 +3,29 @@ const { spawn, spawnSync } = require('child_process');
 const pty = require('node-pty');
 const fs = require('fs');
 const path = require('path');
+const mysql = require('mysql2/promise');
 const store = require('./store');
 const iconv = require('iconv-lite');
 
 const activeCollections = new Set();
 const activeRuns = new Map();
 const activeTerminals = new Map();
+let boardDbPool = null;
+
+function getBoardDbPool() {
+  if (boardDbPool) return boardDbPool;
+  boardDbPool = mysql.createPool({
+    host: process.env.BOARD_DB_HOST || '127.0.0.1',
+    port: Number(process.env.BOARD_DB_PORT || 3306),
+    user: process.env.BOARD_DB_USER || 'root',
+    password: process.env.BOARD_DB_PASSWORD || '123123',
+    database: process.env.BOARD_DB_NAME || 'land_news',
+    waitForConnections: true,
+    connectionLimit: 4,
+    queueLimit: 0
+  });
+  return boardDbPool;
+}
 
 function sendToRenderer(event, channel, payload) {
   event.sender.send(channel, payload);
@@ -312,6 +329,66 @@ function registerIpcHandlers() {
     const content = fs.readFileSync(filePaths[0], 'utf-8');
     const data = JSON.parse(content);
     return { ok: true, data };
+  });
+
+  ipcMain.handle('board:fetch-data', async () => {
+    try {
+      const pool = getBoardDbPool();
+      const [newsRows] = await pool.query(
+        `
+          SELECT
+            id,
+            publish_date,
+            source,
+            sentiment_score,
+            keywords
+          FROM land_news_analysis
+          ORDER BY publish_date DESC
+          LIMIT 5000
+        `
+      );
+      const [wordRows] = await pool.query(
+        `
+          SELECT
+            word,
+            count
+          FROM word_frequency_stats
+          ORDER BY count DESC
+          LIMIT 600
+        `
+      );
+      const news = Array.isArray(newsRows)
+        ? newsRows.map((row) => {
+            let keywords = [];
+            if (Array.isArray(row.keywords)) {
+              keywords = row.keywords;
+            } else if (typeof row.keywords === 'string' && row.keywords.trim()) {
+              try {
+                const parsed = JSON.parse(row.keywords);
+                keywords = Array.isArray(parsed) ? parsed : [];
+              } catch (err) {
+                keywords = [];
+              }
+            }
+            return {
+              id: row.id,
+              publish_date: row.publish_date ? String(row.publish_date).slice(0, 10) : '',
+              source: row.source || '未知来源',
+              sentiment_score: Number(row.sentiment_score || 0),
+              keywords
+            };
+          })
+        : [];
+      const words = Array.isArray(wordRows)
+        ? wordRows.map((row) => ({
+            word: row.word || '',
+            count: Number(row.count || 0)
+          }))
+        : [];
+      return { ok: true, news, words };
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : '数据库连接失败' };
+    }
   });
 
   ipcMain.handle('settings:detect-shells', () => {
