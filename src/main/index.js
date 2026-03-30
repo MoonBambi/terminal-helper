@@ -3,7 +3,7 @@ const path = require('path');
 const { registerIpcHandlers } = require('./ipcHandlers');
 
 const isDev = !app.isPackaged;
-const appIconPath = path.join(__dirname, 'assets', 'dumbox-icon.png');
+const appIconPath = path.join(__dirname, 'assets', 'dumbox-icon.ico');
 
 app.setName('DumbOx');
 if (process.platform === 'win32') {

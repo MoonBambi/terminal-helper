@@ -41,6 +41,14 @@
         <nav class="space-y-1 mb-6 text-sm">
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
+            :class="activePage === 'board' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
+            @click="activePage = 'board'; store.selectedCollectionId = null"
+          >
+            <AllCardsIcon class="h-4 w-4" />
+            看板
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
             :class="activePage === 'cards' && !store.selectedCollectionId ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
             @click="activePage = 'cards'; store.selectedCollectionId = null"
           >
@@ -107,7 +115,8 @@
           class="flex-1 overflow-hidden min-h-0 main-divider"
           :class="activePage === 'terminal' ? 'px-0 py-0 terminal-outer' : 'px-6 py-4'"
         >
-          <main v-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
+          <main v-if="activePage === 'board'" class="h-full"></main>
+          <main v-else-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
             <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10">
               <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px] shadow-sm search-shell">
                 <input v-model="store.searchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索命令、描述、标签" />
@@ -881,7 +890,7 @@ const CollectionsIcon = FolderKanban;
 const TasksIcon = ListTodo;
 
 const store = useDataStore();
-const activePage = ref('cards');
+const activePage = ref('board');
 const logoAnimSeed = ref(0);
 const fabAnimKey = ref(0);
 const logCollapsed = ref(false);
