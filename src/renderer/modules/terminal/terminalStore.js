@@ -399,6 +399,11 @@ export const useDataStore = defineStore('data', {
         this.activeRunId = null;
       }
       this.persist();
+    },
+    clearAllRunLogs() {
+      this.runLogs = [];
+      this.activeRunId = null;
+      this.persist();
     }
   }
 });

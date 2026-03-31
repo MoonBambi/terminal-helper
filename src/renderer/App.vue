@@ -132,678 +132,150 @@
           :class="activePage === 'terminal' ? 'px-0 py-0 terminal-outer' : 'px-6 py-4'"
         >
           <main v-if="activePage === 'board'" class="h-full min-h-0 overflow-auto pr-1 scroll-fade">
-            <div class="board-shell space-y-4 pb-6">
-              <section class="card-panel rounded-xl p-4 board-header">
-                <h3 class="text-sm font-semibold text-slate-700">土地流转舆情看板</h3>
-                <p class="text-xs text-slate-500 mt-1">基于新闻表与词频表的样式化分析视图（先行展示）</p>
-              </section>
-
-              <section class="grid grid-cols-12 gap-4">
-                <article class="card-panel rounded-xl p-4 col-span-4 board-card board-card-glass">
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-slate-700">舆情“晴雨表”</h4>
-                    <span class="text-[11px] text-slate-500">{{ boardTotalNews }} 条</span>
-                  </div>
-                  <div ref="boardSentimentChartRef" class="mt-3 board-chart-host board-chart-host-sm"></div>
-                  <div class="space-y-2 flex-1 min-w-0 mt-2">
-                    <div v-for="item in boardSentimentDistribution" :key="item.key" class="flex items-center justify-between text-xs gap-2">
-                      <div class="flex items-center gap-2 min-w-0">
-                        <span class="board-legend-dot" :style="{ background: item.color }"></span>
-                        <span class="text-slate-600 truncate">{{ item.label }}</span>
-                      </div>
-                      <span class="text-slate-500">{{ item.count }} / {{ item.percent }}%</span>
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 mt-4">
-                    <div class="board-kpi">
-                      <p class="text-[11px] text-slate-500">平均情感得分</p>
-                      <p class="text-lg font-semibold text-slate-700">{{ boardAverageSentiment }}</p>
-                    </div>
-                    <div class="board-kpi">
-                      <p class="text-[11px] text-slate-500">极端情绪预警</p>
-                      <p class="text-lg font-semibold text-slate-700">{{ boardExtremeSentimentCount }}</p>
-                    </div>
-                  </div>
-                </article>
-
-                <article class="card-panel rounded-xl p-4 col-span-8 board-card board-card-glass">
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-slate-700">情感走势“心跳图”</h4>
-                    <span class="text-[11px] text-slate-500">按月聚合</span>
-                  </div>
-                  <div ref="boardTrendChartRef" class="mt-3 board-chart-host board-chart-host-lg"></div>
-                  <div class="mt-2 flex items-center gap-4 text-[11px] text-slate-500">
-                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-green"></i> 平均情感分</span>
-                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-blue"></i> 新闻总量</span>
-                  </div>
-                </article>
-
-                <article class="card-panel rounded-xl p-4 col-span-6 board-card board-card-glass board-fixed-panel">
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-slate-700">媒体“偏好阵地”</h4>
-                    <span class="text-[11px] text-slate-500">来源对比</span>
-                  </div>
-                  <div ref="boardSourceChartRef" class="mt-3 board-chart-host board-chart-host-md"></div>
-                  <div class="mt-3 flex items-center gap-3 text-[11px] text-slate-500">
-                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-green"></i> 正面</span>
-                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-yellow"></i> 中性</span>
-                    <span class="inline-flex items-center gap-1"><i class="board-dot board-dot-red"></i> 负面</span>
-                  </div>
-                </article>
-
-                <article class="card-panel rounded-xl p-4 col-span-6 board-card board-card-cloud board-fixed-panel board-cloud-panel">
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-slate-700">高频词“情绪色彩”</h4>
-                    <span class="text-[11px] text-slate-500">关键词与情感联动</span>
-                  </div>
-                  <div class="mt-3 board-cloud board-cloud-scroll">
-                    <span
-                      v-for="word in boardSentimentWordCloud"
-                      :key="word.word"
-                      class="board-cloud-word"
-                      :style="{ fontSize: `${word.size}px`, color: word.color, opacity: word.opacity }"
-                      :title="`${word.word} · ${word.count} 次 · ${word.sentiment.toFixed(3)}`"
-                    >
-                      {{ word.word }}
-                    </span>
-                  </div>
-                </article>
-              </section>
-            </div>
+            <BoardView
+              :board-sentiment-distribution="boardSentimentDistribution"
+              :board-total-news="boardTotalNews"
+              :board-average-sentiment="boardAverageSentiment"
+              :board-extreme-sentiment-count="boardExtremeSentimentCount"
+              :board-sentiment-word-cloud="boardSentimentWordCloud"
+              :set-board-sentiment-chart-ref="setBoardSentimentChartRef"
+              :set-board-trend-chart-ref="setBoardTrendChartRef"
+              :set-board-source-chart-ref="setBoardSourceChartRef"
+            />
           </main>
           <main v-else-if="activePage === 'library'" class="h-full min-h-0 flex flex-col gap-4 overflow-hidden">
-            <section class="library-panel flex-1 min-h-0">
-              <div class="library-panel-head">
-                <div>
-                  <h3 class="text-sm font-semibold text-slate-700">新闻资料库</h3>
-                </div>
-                <div class="library-search">
-                  <input
-                    v-model="libraryQuery"
-                    class="library-search-input"
-                    placeholder="搜索标题 / 来源 / 摘要 / 关键词"
-                  />
-                </div>
-              </div>
-              <div class="library-list flex-1 min-h-0">
-                <div v-if="libraryLoading" class="library-empty">加载中...</div>
-                <div v-else-if="!libraryItems.length" class="library-empty">暂无匹配新闻</div>
-                <div v-else class="library-rows">
-                  <article
-                    v-for="item in libraryItems"
-                    :key="item.id"
-                    class="library-row"
-                    :class="expandedLibraryId === item.id ? 'library-row-expanded' : ''"
-                    @click="expandedLibraryId = expandedLibraryId === item.id ? null : item.id"
-                  >
-                    <div class="library-row-head">
-                      <h4 class="library-title" :title="item.title">{{ item.title || '未命名标题' }}</h4>
-                      <span class="library-date">{{ item.publish_date || '未知日期' }}</span>
-                    </div>
-                    <div class="library-meta">
-                      <span>{{ item.source || '未知来源' }}</span>
-                      <span>情感 {{ item.sentiment_score.toFixed(3) }}</span>
-                    </div>
-                    <p class="library-summary" v-if="expandedLibraryId !== item.id">
-                      {{ item.content_summary || '暂无摘要' }}
-                    </p>
-                    <p class="library-summary-full" v-else>
-                      {{ item.content_summary || '暂无摘要' }}
-                    </p>
-                    <div class="library-tags" v-if="item.keywords && item.keywords.length">
-                      <span v-for="(tag, idx) in item.keywords" :key="`${item.id}-${idx}`" class="library-tag">
-                        {{ tag }}
-                      </span>
-                    </div>
-                  </article>
-                </div>
-              </div>
-              <div class="library-footer">
-                <div class="library-count">共 {{ libraryTotal }} 条</div>
-                <div class="library-pager">
-                  <button class="icon-btn" :disabled="libraryPage <= 1" @click="changeLibraryPage(libraryPage - 1)" title="上一页">
-                    <ChevronLeftIcon class="h-4 w-4" />
-                  </button>
-                  <span class="library-page">第 {{ libraryPage }} / {{ libraryTotalPages }} 页</span>
-                  <button class="icon-btn" :disabled="libraryPage >= libraryTotalPages" @click="changeLibraryPage(libraryPage + 1)" title="下一页">
-                    <ChevronRightIcon class="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </section>
+            <LibraryView
+              :library-query="libraryQuery"
+              :library-loading="libraryLoading"
+              :library-items="libraryItems"
+              :library-total="libraryTotal"
+              :library-page="libraryPage"
+              :library-total-pages="libraryTotalPages"
+              :expanded-library-id="expandedLibraryId"
+              :on-query-change="updateLibraryQuery"
+              :on-toggle-expand="toggleLibraryExpand"
+              :on-page-change="changeLibraryPage"
+            />
           </main>
           <main v-else-if="activePage === 'qa'" class="h-full min-h-0 flex flex-col gap-3">
-            <div class="qa-display">
-              <p v-if="!qaCaveLines.length" class="qa-line qa-line-empty">暂无内容</p>
-              <p v-for="(line, index) in qaCaveLines" :key="`qa-line-${index}`" class="qa-line">
-                {{ line }}
-              </p>
-            </div>
-            <div class="qa-chat-shell">
-              <textarea
-                v-model="qaInput"
-                class="qa-chat-input"
-                placeholder="输入内容..."
-                rows="3"
-                @keydown.enter.exact.prevent="sendQaInput"
-              />
-              <button class="qa-chat-send" type="button" :disabled="qaLoading" @click="sendQaInput">
-                {{ qaLoading ? '发送中' : '发送' }}
-              </button>
-            </div>
+            <QaView
+              :qa-cave-lines="qaCaveLines"
+              :qa-input="qaInput"
+              :qa-loading="qaLoading"
+              :on-input="updateQaInput"
+              :on-send="sendQaInput"
+            />
           </main>
           <main v-else-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
-            <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10">
-              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-[360px] shadow-sm search-shell">
-                <input v-model="store.searchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索命令、描述、标签" />
-              </div>
-            </div>
-            <div class="flex-1 overflow-auto pr-1 min-h-0 scroll-fade pb-24 pt-16">
-              <div class="grid grid-cols-3 gap-4">
-                <div
-                  v-if="store.selectedCollectionId && store.selectedCollection"
-                  class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start relative stop-card-panel"
-                >
-                  <div class="flex items-start justify-between">
-                    <div>
-                      <h3 class="text-lg font-semibold truncate max-w-[16ch]">停止</h3>
-                      <p class="text-xs text-slate-500 truncate">点击停止时执行</p>
-                    </div>
-                  </div>
-                  <div class="text-xs font-mono text-slate-700 bg-white/80 border border-rose-200 rounded-md px-2 py-1 command-ellipsis">
-                    {{ collectionStopAction.command || '未设置停止命令（编辑集合可配置）' }}
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="card-chip uppercase">{{ collectionStopAction.shell || 'cmd' }}</span>
-                    <span class="card-chip">{{ collectionStopAction.useDedicatedTerminal ? '新终端' : '同终端' }}</span>
-                  </div>
-                  <div class="mt-auto flex items-center justify-center gap-3">
-                    <button class="icon-btn" @click="openStopActionEditor" title="编辑停止">
-                      <PencilIcon class="h-4 w-4" />
-                    </button>
-                    <button
-                      v-if="store.selectedCollection && isCollectionRunning(store.selectedCollection.id)"
-                      class="icon-btn icon-btn-danger"
-                      @click="stopActiveRun"
-                      title="执行停止"
-                    >
-                      <SquareIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div
-                  v-for="entry in displayCards"
-                  :key="`${entry.card.id}-${entry.index}`"
-                  class="card-panel card-fixed rounded-xl p-4 flex flex-col gap-3 w-[90%] justify-self-start relative"
-                  :class="entry.card.shell === 'ps' ? 'card-shell-ps' : entry.card.shell === 'bash' ? 'card-shell-bash' : 'card-shell-cmd'"
-                >
-                  <div v-if="store.selectedCollectionId" class="order-badge">
-                    <button
-                      v-if="editingOrderId !== entry.index"
-                      class="order-badge-btn"
-                      @click.stop="editCollectionOrder(entry.index)"
-                      title="运行顺序"
-                    >
-                      {{ entry.index + 1 }}
-                    </button>
-                    <input
-                      v-else
-                      :ref="(el) => setOrderInputRef(entry.index, el)"
-                      v-model="orderInputValue"
-                      class="order-badge-input"
-                      @keyup.enter.stop="commitCollectionOrder(entry.index)"
-                      @keyup.esc.stop="cancelCollectionOrder"
-                      @blur="commitCollectionOrder(entry.index)"
-                    />
-                  </div>
-                  <div class="flex items-start justify-between">
-                    <div>
-                      <h3 class="text-lg font-semibold truncate max-w-[16ch]">{{ entry.card.name }}</h3>
-                      <p class="text-xs text-slate-500 truncate">{{ entry.card.description || '暂无描述' }}</p>
-                    </div>
-                  </div>
-                  <div class="text-xs font-mono text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 command-ellipsis">
-                    {{ entry.card.command }}
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="card-chip uppercase">{{ entry.card.shell || 'cmd' }}</span>
-                  </div>
-                  <div class="mt-auto flex items-center justify-center gap-3">
-                    <button
-                      v-if="isCardRunning(entry.card.id)"
-                      class="icon-btn icon-btn-danger"
-                      @click="stopActiveRun"
-                      title="停止"
-                    >
-                      <SquareIcon class="h-4 w-4" />
-                    </button>
-                    <button v-else class="icon-btn icon-btn-primary" @click="confirmRunCard(entry.card)" title="执行">
-                      <PlayIcon class="h-4 w-4" />
-                    </button>
-                    <button
-                      class="icon-btn"
-                      :class="isCardSelected(entry.card.id, entry.index) ? 'icon-btn-selected' : ''"
-                      @click="toggleSelectForCollection(entry.card.id, entry.index)"
-                      title="选中"
-                    >
-                      <CheckCircleIcon v-if="isCardSelected(entry.card.id, entry.index)" class="h-4 w-4" />
-                      <CircleIcon v-else class="h-4 w-4" />
-                    </button>
-                    <button class="icon-btn" @click="openCardModal(entry.card)" title="编辑">
-                      <PencilIcon class="h-4 w-4" />
-                    </button>
-                    <button class="icon-btn" @click="handleDuplicateCard(entry.card, entry.index)" title="复制">
-                      <CopyIcon class="h-4 w-4" />
-                    </button>
-                    <button class="icon-btn icon-btn-danger" @click="confirmDeleteCard(entry.card, entry.index)" title="删除">
-                      <TrashIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <section
-              class="card-panel rounded-xl fixed right-6 bottom-6 w-[360px] max-h-[70vh] transition-all overflow-hidden"
-              :class="logCollapsed ? 'p-3' : 'p-4 space-y-4'"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <button class="icon-btn" @click="logCollapsed = !logCollapsed" title="折叠/展开">
-                    <ChevronDownIcon class="h-4 w-4 transition-transform" :class="logCollapsed ? '-rotate-90' : ''" />
-                  </button>
-                  <h2 class="text-sm font-semibold text-slate-700">历史运行记录</h2>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button
-                    class="icon-btn"
-                    :class="isCollectionHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''"
-                    @click="clearCollectionHistoryLogs"
-                    title="清理历史"
-                  >
-                    <BroomIcon class="h-4 w-4" />
-                  </button>
-                  <span class="text-xs text-slate-500">{{ collectionHistoryLogs.length }} 条</span>
-                </div>
-              </div>
-              <div v-if="!logCollapsed" class="space-y-3">
-                <div class="log-box rounded-lg p-3 max-h-[320px] overflow-auto space-y-3">
-                  <template v-if="collectionHistoryLogs.length">
-                    <div
-                      v-for="run in collectionHistoryLogs"
-                      :key="run.id"
-                      class="rounded-lg border border-slate-200 bg-white/70 px-3 py-2 space-y-1"
-                    >
-                      <div class="flex items-center justify-between gap-2">
-                        <p class="text-sm font-medium text-slate-700 truncate">{{ run.targetName }}</p>
-                        <span
-                          class="text-xs"
-                          :class="
-                            run.status === 'failed' || run.status === 'stopped'
-                              ? 'text-rose-600'
-                              : run.status === 'success'
-                              ? 'text-emerald-600'
-                              : 'text-indigo-600'
-                          "
-                        >
-                          {{ run.status }}
-                        </span>
-                      </div>
-                      <p class="text-[11px] text-slate-500">开始：{{ formatDate(run.startedAt) }}</p>
-                      <p class="text-[11px] text-slate-500">
-                        结束：{{ run.endedAt ? formatDate(run.endedAt) : '运行中' }} · 耗时：{{ formatDuration(run.startedAt, run.endedAt) }}
-                      </p>
-                    </div>
-                  </template>
-                  <p v-else class="text-[11px] text-slate-500">暂无历史运行记录</p>
-                </div>
-              </div>
-            </section>
-            <div class="fab-group" :key="`fab-cards-${activePage}-${store.selectedCollectionId || 'all'}-${fabAnimKey}`">
-              <button
-                class="fab fab-bounce relative"
-                @click="openCollectionModal(store.selectedCollection || undefined)"
-                :title="store.selectedCollection ? '编辑集合' : '新建集合'"
-              >
-                <PencilIcon v-if="store.selectedCollection" class="h-5 w-5" />
-                <FolderPlusIcon v-else class="h-5 w-5" />
-                <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
-              </button>
-              <button
-                class="fab fab-danger fab-bounce relative"
-                :class="selectedCount ? '' : 'opacity-40 pointer-events-none'"
-                @click="confirmDeleteSelectedCards"
-                title="批量删除卡片"
-              >
-                <TrashIcon class="h-5 w-5" />
-                <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
-              </button>
-              <button class="fab fab-alt fab-bounce" @click="openCardModal()" title="新建卡片">
-                <SquarePlusIcon class="h-5 w-5" />
-              </button>
-              <button class="fab fab-bounce" @click="importData" title="导入 JSON">
-                <ImportIcon class="h-5 w-5" />
-              </button>
-              <button class="fab fab-alt fab-bounce" @click="exportData" title="导出 JSON">
-                <ExportIcon class="h-5 w-5" />
-              </button>
-              <button
-                v-if="store.selectedCollection && isCollectionRunning(store.selectedCollection.id)"
-                class="fab fab-danger fab-bounce"
-                @click="stopActiveRun"
-                title="停止运行"
-              >
-                <SquareIcon class="h-5 w-5" />
-              </button>
-              <button
-                v-else-if="store.selectedCollection"
-                class="fab fab-play fab-bounce"
-                @click="runCollection(store.selectedCollection)"
-                title="运行集合"
-              >
-                <PlayIcon class="h-5 w-5" />
-              </button>
-            </div>
+            <CardsView
+              :store="store"
+              :display-cards="displayCards"
+              :collection-stop-action="collectionStopAction"
+              :open-stop-action-editor="openStopActionEditor"
+              :is-collection-running="isCollectionRunning"
+              :stop-active-run="stopActiveRun"
+              :editing-order-id="editingOrderId"
+              :edit-collection-order="editCollectionOrder"
+              :set-order-input-ref="setOrderInputRef"
+              :order-input-value="orderInputValue"
+              :on-order-input="updateOrderInput"
+              :commit-collection-order="commitCollectionOrder"
+              :cancel-collection-order="cancelCollectionOrder"
+              :is-card-running="isCardRunning"
+              :confirm-run-card="confirmRunCard"
+              :is-card-selected="isCardSelected"
+              :toggle-select-for-collection="toggleSelectForCollection"
+              :open-card-modal="openCardModal"
+              :handle-duplicate-card="handleDuplicateCard"
+              :confirm-delete-card="confirmDeleteCard"
+              :log-collapsed="logCollapsed"
+              :on-toggle-log-collapsed="toggleLogCollapsed"
+              :collection-history-logs="collectionHistoryLogs"
+              :is-collection-history-clear-disabled="isCollectionHistoryClearDisabled"
+              :clear-collection-history-logs="clearCollectionHistoryLogs"
+              :format-date="formatDate"
+              :format-duration="formatDuration"
+              :selected-count="selectedCount"
+              :open-collection-modal="openCollectionModal"
+              :confirm-delete-selected-cards="confirmDeleteSelectedCards"
+              :import-data="importData"
+              :export-data="exportData"
+              :run-collection="runCollection"
+              :fab-anim-key="fabAnimKey"
+              :active-page="activePage"
+            />
           </main>
           <main v-else-if="activePage === 'collections'" class="space-y-4 h-full flex flex-col min-h-0">
-            <div class="rounded-xl p-4 space-y-4 flex-1 overflow-hidden min-h-0 flex flex-col">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="text-sm font-semibold text-slate-700">集合列表</h3>
-                  <p class="text-xs text-slate-400">管理集合与卡片排序</p>
-                </div>
-              </div>
-              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
-                <input v-model="collectionSearchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索集合名称" />
-              </div>
-              <div class="space-y-2 overflow-auto pr-1 min-h-0 flex-1 scroll-fade pt-2 pb-24">
-                <div
-                  v-for="collection in filteredCollections"
-                  :key="collection.id"
-                  class="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2"
-                >
-                  <div class="flex items-center gap-2 min-w-0">
-                    <button class="icon-btn" @click="toggleCollectionSelection(collection.id)" title="选择集合">
-                      <CheckCircleIcon v-if="selectedCollections.includes(collection.id)" class="h-4 w-4 text-indigo-600" />
-                      <CircleIcon v-else class="h-4 w-4 text-slate-400" />
-                    </button>
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium text-slate-700 truncate">{{ collection.name }}</p>
-                      <p class="text-xs text-slate-400">{{ collection.cardIds.length }} 张卡片</p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <button class="icon-btn" @click="openCollectionModal(collection)" title="编辑">
-                      <PencilIcon class="h-4 w-4" />
-                    </button>
-                    <button class="icon-btn" @click="store.duplicateCollection(collection)" title="复制">
-                      <CopyIcon class="h-4 w-4" />
-                    </button>
-                    <button class="icon-btn icon-btn-danger" @click="confirmDeleteCollection(collection)" title="删除">
-                      <TrashIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div v-if="filteredCollections.length === 0" class="text-sm text-slate-400 py-6 text-center">
-                  还没有集合，点击“新建集合”开始。
-                </div>
-              </div>
-            </div>
-            <div class="fab-group" :key="`fab-collections-${activePage}-${fabAnimKey}`">
-              <button class="fab fab-bounce relative" @click="openCollectionModal()" title="新建集合">
-                <FolderPlusIcon class="h-5 w-5" />
-                <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
-              </button>
-              <button
-                class="fab fab-danger fab-bounce relative"
-                :class="selectedCollectionCount ? '' : 'opacity-40 pointer-events-none'"
-                @click="confirmDeleteSelectedCollections"
-                title="批量删除"
-              >
-                <TrashIcon class="h-5 w-5" />
-                <span v-if="selectedCollectionCount" class="fab-badge">{{ selectedCollectionCount }}</span>
-              </button>
-              <button class="fab fab-bounce" @click="importData" title="导入 JSON">
-                <ImportIcon class="h-5 w-5" />
-              </button>
-              <button class="fab fab-alt fab-bounce" @click="exportData" title="导出 JSON">
-                <ExportIcon class="h-5 w-5" />
-              </button>
-            </div>
+            <CollectionsView
+              :store="store"
+              :collection-search-query="collectionSearchQuery"
+              :on-collection-search="updateCollectionSearch"
+              :filtered-collections="filteredCollections"
+              :toggle-collection-selection="toggleCollectionSelection"
+              :selected-collections="selectedCollections"
+              :open-collection-modal="openCollectionModal"
+              :confirm-delete-collection="confirmDeleteCollection"
+              :selected-count="selectedCount"
+              :selected-collection-count="selectedCollectionCount"
+              :confirm-delete-selected-collections="confirmDeleteSelectedCollections"
+              :import-data="importData"
+              :export-data="exportData"
+              :fab-anim-key="fabAnimKey"
+              :active-page="activePage"
+            />
           </main>
           <main v-else-if="activePage === 'tasks'" class="space-y-4 h-full flex flex-col min-h-0">
-            <div class="rounded-xl p-4 space-y-4 flex-1 overflow-hidden min-h-0 flex flex-col">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="text-sm font-semibold text-slate-700">任务列表</h3>
-                  <p class="text-xs text-slate-400">创建任务并串行运行所选集合</p>
-                </div>
-              </div>
-              <div class="bg-white border border-slate-200 rounded-xl px-3 py-1.5 search-shell">
-                <input v-model="taskSearchQuery" class="w-full bg-transparent text-sm text-slate-700 focus:outline-none" placeholder="搜索任务名称" />
-              </div>
-              <div class="space-y-2 overflow-auto pr-1 min-h-0 flex-1 scroll-fade pt-2 pb-24">
-                <div
-                  v-for="task in filteredTasks"
-                  :key="task.id"
-                  class="task-row rounded-lg px-3 py-2"
-                  :class="`task-row-status-${taskRunStatus(task.id)}`"
-                >
-                  <div v-if="latestTaskRun(task.id)" class="task-row-progress" :style="{ width: `${taskProgressPercent(task.id)}%` }"></div>
-                  <div class="task-row-content flex items-center justify-between">
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium text-slate-700 truncate">{{ task.name }}</p>
-                      <p class="text-xs text-slate-400 truncate">{{ task.collectionIds.length }} 个集合 · {{ taskCollectionsText(task) }}</p>
-                      <p class="text-xs mt-0.5" :class="taskProgressTone(task.id)">{{ taskProgressText(task.id) }}</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <button
-                        class="icon-btn icon-btn-primary"
-                        :class="isRunActive || isTaskRunning(task.id) ? 'opacity-40 pointer-events-none' : ''"
-                        @click="runTask(task)"
-                        title="运行任务"
-                      >
-                        <PlayIcon class="h-4 w-4" />
-                      </button>
-                      <button class="icon-btn" @click="openTaskModal(task)" title="编辑">
-                        <PencilIcon class="h-4 w-4" />
-                      </button>
-                      <button class="icon-btn" @click="store.duplicateTask(task)" title="复制">
-                        <CopyIcon class="h-4 w-4" />
-                      </button>
-                      <button class="icon-btn icon-btn-danger" @click="confirmDeleteTask(task)" title="删除">
-                        <TrashIcon class="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div v-if="taskCompletedBadges(task.id).length" class="task-complete-badges">
-                    <div
-                      v-for="badge in taskCompletedBadges(task.id)"
-                      :key="`task-badge-${task.id}-${badge.key}-${taskDoneAnimSeed}`"
-                      class="task-complete-badge-item"
-                      :class="badge.mode === 'error' ? 'task-complete-badge-item-error' : ''"
-                      :title="badge.title"
-                      :style="{ animationDelay: `${badge.index * 60}ms` }"
-                    >
-                      <CheckIcon v-if="badge.mode === 'success'" class="h-4 w-4" />
-                      <CloseIcon v-else class="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-                <div v-if="filteredTasks.length === 0" class="text-sm text-slate-400 py-6 text-center">
-                  还没有任务，点击“新建任务”开始。
-                </div>
-              </div>
-              <section
-                class="card-panel rounded-xl transition-all overflow-hidden fixed right-6 bottom-6 w-[360px] max-w-full max-h-[70vh] z-20"
-                :class="taskHistoryCollapsed ? 'p-3' : 'p-4 space-y-4'"
-              >
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-1">
-                    <button class="icon-btn" @click="taskHistoryCollapsed = !taskHistoryCollapsed" title="折叠/展开">
-                      <ChevronDownIcon class="h-4 w-4 transition-transform" :class="taskHistoryCollapsed ? '-rotate-90' : ''" />
-                    </button>
-                    <h2 class="text-sm font-semibold text-slate-700">任务历史记录</h2>
-                  </div>
-                  <div class="flex items-center gap-1">
-                    <button
-                      class="icon-btn"
-                      :class="isTaskHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''"
-                      @click="clearTaskHistoryLogs"
-                      title="清理历史"
-                    >
-                      <BroomIcon class="h-4 w-4" />
-                    </button>
-                    <span class="text-xs text-slate-500">{{ taskHistoryLogs.length }} 条</span>
-                  </div>
-                </div>
-                <div v-if="!taskHistoryCollapsed" class="space-y-3">
-                  <div class="log-box rounded-lg p-3 max-h-[320px] overflow-auto space-y-3">
-                    <template v-if="taskHistoryLogs.length">
-                      <div
-                        v-for="log in taskHistoryLogs"
-                        :key="log.id"
-                        class="rounded-lg border border-slate-200 bg-white/70 px-3 py-2 space-y-1"
-                      >
-                        <div class="flex items-center justify-between gap-2">
-                          <p class="text-sm font-medium text-slate-700 truncate">{{ log.taskName }}</p>
-                          <span class="text-xs" :class="taskHistoryTone(log.status)">{{ log.status }}</span>
-                        </div>
-                        <p class="text-[11px] text-slate-500">
-                          开始：{{ formatDate(log.startedAt) }}
-                        </p>
-                        <p class="text-[11px] text-slate-500">
-                          结束：{{ log.endedAt ? formatDate(log.endedAt) : '运行中' }} · 耗时：{{ formatDuration(log.startedAt, log.endedAt) }}
-                        </p>
-                        <p class="text-[11px] text-slate-500">
-                          进度 {{ log.completedCollections || 0 }}/{{ log.totalCollections || 0 }}
-                        </p>
-                      </div>
-                    </template>
-                    <p v-else class="text-[11px] text-slate-500">暂无任务历史记录</p>
-                  </div>
-                </div>
-              </section>
-            </div>
-            <div class="fab-group" :key="`fab-tasks-${activePage}-${fabAnimKey}`">
-              <button class="fab fab-bounce" @click="openTaskModal()" title="新建任务">
-                <TasksIcon class="h-5 w-5" />
-              </button>
-            </div>
+            <TasksView
+              :store="store"
+              :task-search-query="taskSearchQuery"
+              :on-task-search="updateTaskSearch"
+              :filtered-tasks="filteredTasks"
+              :task-run-status="taskRunStatus"
+              :latest-task-run="latestTaskRun"
+              :task-progress-percent="taskProgressPercent"
+              :task-progress-tone="taskProgressTone"
+              :task-progress-text="taskProgressText"
+              :task-collections-text="taskCollectionsText"
+              :is-run-active="isRunActive"
+              :is-task-running="isTaskRunning"
+              :run-task="runTask"
+              :open-task-modal="openTaskModal"
+              :confirm-delete-task="confirmDeleteTask"
+              :task-completed-badges="taskCompletedBadges"
+              :task-done-anim-seed="taskDoneAnimSeed"
+              :task-history-collapsed="taskHistoryCollapsed"
+              :on-toggle-task-history-collapsed="toggleTaskHistoryCollapsed"
+              :is-task-history-clear-disabled="isTaskHistoryClearDisabled"
+              :clear-task-history-logs="clearTaskHistoryLogs"
+              :task-history-logs="taskHistoryLogs"
+              :task-history-tone="taskHistoryTone"
+              :format-date="formatDate"
+              :format-duration="formatDuration"
+              :fab-anim-key="fabAnimKey"
+              :active-page="activePage"
+            />
           </main>
           <main v-show="activePage === 'terminal'" class="space-y-4 h-full flex flex-col min-h-0 terminal-panel pt-8 pl-8 pr-4 pb-4">
-            <div class="flex items-center justify-between mb-3 gap-4">
-              <div>
-                <h3 class="text-sm font-semibold text-slate-700">(=^･ω･^=)</h3>
-                <p class="text-xs text-slate-400">ฅ^•ﻌ•^ฅ</p>
-              </div>
-              <div v-if="terminalTabs.length" class="terminal-tabs-strip">
-                <div class="terminal-tabs" @wheel.prevent="handleTerminalTabsWheel">
-                  <div
-                    v-for="tab in terminalTabs"
-                    :key="tab.id"
-                    class="terminal-tab"
-                    :class="activeTerminalTabId === tab.id ? 'active' : ''"
-                    @click="switchTerminalTab(tab.id)"
-                  >
-                    <span class="terminal-tab-label">{{ tab.label }}</span>
-                    <button type="button" class="terminal-tab-close" title="关闭终端标签" @click.stop="closeTerminalTab(tab.id)">
-                      <CloseIcon class="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="terminalTabs.length" class="terminal-stack flex-1 min-h-0">
-              <div
-                v-for="tab in terminalTabs"
-                :key="`terminal-pane-${tab.id}`"
-                v-show="activeTerminalTabId === tab.id"
-                :ref="(el) => setTerminalContainerRef(tab.id, el)"
-                class="terminal-container flex-1 min-h-0"
-              ></div>
-            </div>
-            <div v-else class="terminal-empty flex-1 min-h-0">
-              <p class="text-sm text-slate-500">暂无终端会话，运行集合后将自动创建。</p>
-            </div>
-            <div class="fab-group terminal-fab-group" :key="`fab-terminal-${activePage}-${fabAnimKey}`">
-              <button
-                class="fab fab-bounce"
-                :class="activeTerminalTabId ? '' : 'opacity-40 pointer-events-none'"
-                @click="clearActiveTerminalConnection"
-                title="清除连接"
-              >
-                <BroomIcon class="h-5 w-5" />
-              </button>
-              <button
-                class="fab fab-danger fab-bounce"
-                :class="isRunActive ? '' : 'opacity-40 pointer-events-none'"
-                @click="stopActiveRun"
-                title="停止运行"
-              >
-                <SquareIcon class="h-5 w-5" />
-              </button>
-            </div>
+            <TerminalView
+              :terminal-tabs="terminalTabs"
+              :active-terminal-tab-id="activeTerminalTabId"
+              :handle-terminal-tabs-wheel="handleTerminalTabsWheel"
+              :switch-terminal-tab="switchTerminalTab"
+              :close-terminal-tab="closeTerminalTab"
+              :set-terminal-container-ref="setTerminalContainerRef"
+              :active-page="activePage"
+              :fab-anim-key="fabAnimKey"
+              :clear-active-terminal-connection="clearActiveTerminalConnection"
+              :is-run-active="isRunActive"
+              :stop-active-run="stopActiveRun"
+            />
           </main>
           <main v-if="activePage === 'settings'" class="space-y-4 h-full flex flex-col min-h-0">
-            <div class="rounded-xl p-4 space-y-4 w-full flex-1 overflow-auto min-h-0 scroll-fade">
-              <div>
-                <h3 class="text-sm font-semibold text-slate-700">终端路径</h3>
-                <p class="text-xs text-slate-400">自定义 CMD / PowerShell / Bash 的可执行路径</p>
-              </div>
-              <div class="space-y-3">
-                <div class="space-y-1">
-                  <label class="text-xs text-slate-500">CMD 路径</label>
-                  <div class="flex items-center gap-2">
-                    <input v-model="settingsForm.cmd" class="input" placeholder="例如 C:\\Windows\\System32\\cmd.exe" />
-                    <button class="icon-btn icon-btn-check" title="应用并检测 CMD 路径" @click="applyShell('cmd')">
-                      <CheckIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div class="space-y-1">
-                  <label class="text-xs text-slate-500">PowerShell 路径</label>
-                  <div class="flex items-center gap-2">
-                    <input v-model="settingsForm.ps" class="input" placeholder="例如 C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" />
-                    <button class="icon-btn icon-btn-check" title="应用并检测 PowerShell 路径" @click="applyShell('ps')">
-                      <CheckIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div class="space-y-1">
-                  <label class="text-xs text-slate-500">Bash 路径</label>
-                  <div class="flex items-center gap-2">
-                    <input v-model="settingsForm.bash" class="input" placeholder="例如 C:\\Program Files\\Git\\bin\\bash.exe" />
-                    <button class="icon-btn icon-btn-check" title="应用并检测 Bash 路径" @click="applyShell('bash')">
-                      <CheckIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="pt-2 border-t border-slate-200/80 space-y-3">
-                <div>
-                  <h3 class="text-sm font-semibold text-slate-700">Qwen 问答配置</h3>
-                  <p class="text-xs text-slate-400">保存后无需每次手动设置环境变量</p>
-                </div>
-                <div class="space-y-1">
-                  <label class="text-xs text-slate-500">API Key</label>
-                  <div class="flex items-center gap-2">
-                    <input v-model="settingsForm.qwenApiKey" class="input" type="password" placeholder="sk-..." />
-                    <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
-                      <CheckIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div class="space-y-1">
-                  <label class="text-xs text-slate-500">Base URL</label>
-                  <input v-model="settingsForm.qwenBaseURL" class="input" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
-                </div>
-                <div class="space-y-1">
-                  <label class="text-xs text-slate-500">Model</label>
-                  <input v-model="settingsForm.qwenModel" class="input" placeholder="qwen-plus" />
-                </div>
-              </div>
-              <div class="flex justify-end"></div>
-            </div>
+            <SettingsView
+              :settings-form="settingsForm"
+              :apply-shell="applyShell"
+              :apply-qwen-settings="applyQwenSettings"
+            />
           </main>
         </div>
       </div>
@@ -1042,59 +514,36 @@ import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import {
-  Play,
-  Pencil,
-  Copy,
-  Trash2,
-  ChevronDown,
   Settings,
-  Check,
-  Plus,
-  FolderPlus,
-  Import,
-  Upload,
   Minus,
   Square,
   X,
-  Circle,
-  CheckCircle2,
   Terminal,
-  BrushCleaning,
   LayoutGrid,
   FolderKanban,
   ListTodo,
   BookOpen,
-  ChevronLeft,
-  ChevronRight,
   MessageSquare
 } from 'lucide-vue-next';
+import BoardView from './modules/board/BoardView.vue';
+import LibraryView from './modules/library/LibraryView.vue';
+import QaView from './modules/qa/QaView.vue';
+import CardsView from './modules/cards/CardsView.vue';
+import CollectionsView from './modules/collections/CollectionsView.vue';
+import TasksView from './modules/tasks/TasksView.vue';
+import TerminalView from './modules/terminal/TerminalView.vue';
+import SettingsView from './modules/settings/SettingsView.vue';
 import { useDataStore } from './modules/terminal/terminalStore';
 
-const PlayIcon = Play;
-const PencilIcon = Pencil;
-const CopyIcon = Copy;
-const TrashIcon = Trash2;
-const ChevronDownIcon = ChevronDown;
 const SettingsIcon = Settings;
-const CheckIcon = Check;
-const PlusIcon = Plus;
-const FolderPlusIcon = FolderPlus;
-const SquarePlusIcon = Plus;
-const ImportIcon = Import;
-const ExportIcon = Upload;
 const MinusIcon = Minus;
 const SquareIcon = Square;
 const CloseIcon = X;
-const CircleIcon = Circle;
-const CheckCircleIcon = CheckCircle2;
 const TerminalIcon = Terminal;
-const BroomIcon = BrushCleaning;
 const AllCardsIcon = LayoutGrid;
 const CollectionsIcon = FolderKanban;
 const TasksIcon = ListTodo;
 const LibraryIcon = BookOpen;
-const ChevronLeftIcon = ChevronLeft;
-const ChevronRightIcon = ChevronRight;
 const QaIcon = MessageSquare;
 
 const store = useDataStore();
@@ -1138,12 +587,23 @@ const terminalContainerRefs = new Map();
 const terminalStates = new Map();
 const collectionRunTabByRunId = new Map();
 const pendingCollectionRunTab = ref(null);
+const pendingCardRunTab = ref(null);
 const boardSentimentChartRef = ref(null);
 const boardTrendChartRef = ref(null);
 const boardSourceChartRef = ref(null);
 let boardSentimentChart = null;
 let boardTrendChart = null;
 let boardSourceChart = null;
+
+const setBoardSentimentChartRef = (el) => {
+  boardSentimentChartRef.value = el;
+};
+const setBoardTrendChartRef = (el) => {
+  boardTrendChartRef.value = el;
+};
+const setBoardSourceChartRef = (el) => {
+  boardSourceChartRef.value = el;
+};
 
 function playLogoAnimation() {
   logoAnimSeed.value += 1;
@@ -1171,6 +631,38 @@ async function sendQaInput() {
   } finally {
     qaLoading.value = false;
   }
+}
+
+function updateQaInput(value) {
+  qaInput.value = value;
+}
+
+function updateLibraryQuery(value) {
+  libraryQuery.value = value;
+}
+
+function toggleLibraryExpand(id) {
+  expandedLibraryId.value = expandedLibraryId.value === id ? null : id;
+}
+
+function updateOrderInput(value) {
+  orderInputValue.value = value;
+}
+
+function updateCollectionSearch(value) {
+  collectionSearchQuery.value = value;
+}
+
+function updateTaskSearch(value) {
+  taskSearchQuery.value = value;
+}
+
+function toggleLogCollapsed() {
+  logCollapsed.value = !logCollapsed.value;
+}
+
+function toggleTaskHistoryCollapsed() {
+  taskHistoryCollapsed.value = !taskHistoryCollapsed.value;
 }
 
 async function loadLibraryPage() {
@@ -1325,9 +817,10 @@ const activeRun = computed(() => store.runLogs.find((r) => r.id === store.active
 const isRunActive = computed(() => activeRun.value && activeRun.value.status === 'running');
 const collectionHistoryLogs = computed(() => {
   const selectedCollectionId = store.selectedCollectionId;
-  const logs = store.runLogs.filter((run) => run.targetType === 'collection');
-  if (!selectedCollectionId) return logs;
-  return logs.filter((run) => run.targetId === selectedCollectionId);
+  if (selectedCollectionId) {
+    return store.runLogs.filter((run) => run.targetType === 'collection' && run.targetId === selectedCollectionId);
+  }
+  return store.runLogs;
 });
 const selectedCount = computed(() => selectedForCollection.value.length);
 const selectedCollectionCount = computed(() => selectedCollections.value.length);
@@ -1770,6 +1263,9 @@ async function closeTerminalTab(tabId) {
   if (pendingCollectionRunTab.value === tabId) {
     pendingCollectionRunTab.value = null;
   }
+  if (pendingCardRunTab.value === tabId) {
+    pendingCardRunTab.value = null;
+  }
   const wasActive = activeTerminalTabId.value === tabId;
   destroyTerminalTab(tabId);
   terminalContainerRefs.delete(tabId);
@@ -1806,6 +1302,14 @@ function createCollectionTerminalTab(shell, collectionName) {
   terminalTabSeed.value += 1;
   const id = `term-${terminalTabSeed.value}`;
   const label = `${shellLabel(shell)} ${collectionName}`;
+  terminalTabs.value.push({ id, label, shell: shell || 'cmd', mode: 'run' });
+  return id;
+}
+
+function createCardTerminalTab(shell, cardName) {
+  terminalTabSeed.value += 1;
+  const id = `term-${terminalTabSeed.value}`;
+  const label = `${shellLabel(shell)} ${cardName}`;
   terminalTabs.value.push({ id, label, shell: shell || 'cmd', mode: 'run' });
   return id;
 }
@@ -2557,6 +2061,14 @@ function confirmRunCard(card) {
   confirmModal.confirmText = '确认执行';
   confirmModal.onConfirm = async () => {
     confirmModal.open = false;
+    const preferredShell = card.shell || 'cmd';
+    const tabId = createCardTerminalTab(preferredShell, card.name);
+    activeTerminalTabId.value = tabId;
+    activePage.value = 'terminal';
+    await nextTick();
+    const state = await ensureTerminalTab(tabId, preferredShell);
+    if (!state) return;
+    pendingCardRunTab.value = tabId;
     await window.terminalHelper.runCard(toPlain(card));
   };
   confirmModal.open = true;
@@ -2576,7 +2088,11 @@ function clearCollectionHistoryLogs() {
   if (isCollectionHistoryClearDisabled.value) return;
   const total = collectionHistoryLogs.value.length;
   const collectionId = store.selectedCollectionId || null;
-  store.clearCollectionRunLogs(collectionId);
+  if (collectionId) {
+    store.clearCollectionRunLogs(collectionId);
+  } else {
+    store.clearAllRunLogs();
+  }
   showToast(`已清理 ${total} 条集合历史`, 'success');
 }
 
@@ -2908,6 +2424,13 @@ onMounted(async () => {
       setTerminalInputEnabled(tabId, false);
       writeRunOutput(payload.runId, `\r\n=== 开始运行集合：${targetName} ===\r\n`);
     }
+    if (payload.targetType === 'card') {
+      const tabId = pendingCardRunTab.value || activeTerminalTabId.value;
+      collectionRunTabByRunId.set(payload.runId, tabId);
+      pendingCardRunTab.value = null;
+      setTerminalInputEnabled(tabId, false);
+      writeRunOutput(payload.runId, `\r\n=== 开始运行卡片：${targetName} ===\r\n`);
+    }
   });
   window.terminalHelper.onRunStepBegin((payload) => {
     const card = store.cards.find((c) => c.id === payload.cardId);
@@ -2944,7 +2467,11 @@ onMounted(async () => {
       status: payload.status,
       endedAt: payload.endedAt
     });
-    writeRunOutput(payload.runId, `\r\n=== 集合结束：${payload.status} ===\r\n`);
+    if (runLog && runLog.targetType === 'collection') {
+      writeRunOutput(payload.runId, `\r\n=== 集合结束：${payload.status} ===\r\n`);
+    } else if (runLog && runLog.targetType === 'card') {
+      writeRunOutput(payload.runId, `\r\n=== 卡片结束：${payload.status} ===\r\n`);
+    }
     const tabId = collectionRunTabByRunId.get(payload.runId);
     if (runLog && runLog.targetType === 'collection' && tabId) {
       const shell = getCollectionPreferredShell(runLog.targetId);
