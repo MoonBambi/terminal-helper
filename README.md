@@ -33,28 +33,5 @@ npm run start
 npm run dist:win
 ```
 
-## 数据库（可选）
-看板与资料库默认从 MySQL 读取数据，失败会回退本地示例数据。
-
-默认配置：
-- Host: `127.0.0.1`
-- Port: `3306`
-- User: `root`
-- Password: `123123`
-- Database: `land_news`
-- 表：
-  - `land_news_analysis`
-  - `word_frequency_stats`
-
-可用环境变量覆盖：
-```
-BOARD_DB_HOST
-BOARD_DB_PORT
-BOARD_DB_USER
-BOARD_DB_PASSWORD
-BOARD_DB_NAME
-```
-
 ## Qwen 问答
 在“牛棚配置”中填写 API Key / Base URL / Model 即可使用，无需每次配置环境变量。
-
