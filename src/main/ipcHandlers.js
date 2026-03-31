@@ -450,7 +450,6 @@ function registerIpcHandlers() {
             keywords
           FROM land_news_analysis
           ORDER BY publish_date DESC
-          LIMIT 5000
         `
       );
       const [wordRows] = await pool.query(

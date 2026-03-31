@@ -36,7 +36,6 @@
     <div class="pt-2 border-t border-slate-200/80 space-y-3">
       <div>
         <h3 class="text-sm font-semibold text-slate-700">Qwen 问答配置</h3>
-        <p class="text-xs text-slate-400">保存后无需每次手动设置环境变量</p>
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">API Key</label>
@@ -49,11 +48,21 @@
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">Base URL</label>
-        <input v-model="settingsForm.qwenBaseURL" class="input" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
+        <div class="flex items-center gap-2">
+          <input v-model="settingsForm.qwenBaseURL" class="input" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
+          <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
+            <CheckIcon class="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">Model</label>
-        <input v-model="settingsForm.qwenModel" class="input" placeholder="qwen-plus" />
+        <div class="flex items-center gap-2">
+          <input v-model="settingsForm.qwenModel" class="input" placeholder="qwen-plus" />
+          <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
+            <CheckIcon class="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
     <div class="flex justify-end"></div>

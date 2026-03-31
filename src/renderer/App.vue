@@ -44,7 +44,7 @@
             :class="activePage === 'board' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
             @click="activePage = 'board'; store.selectedCollectionId = null"
           >
-            <AllCardsIcon class="h-4 w-4" />
+            <BoardIcon class="h-4 w-4" />
             看板
           </button>
           <button
@@ -105,7 +105,7 @@
           </button>
         </nav>
         <div class="flex items-center justify-between text-xs text-slate-400">
-          <span>集合</span>
+          <span>牛群</span>
           <span>{{ store.collections.length }}</span>
         </div>
         <div class="mt-3 flex-1 min-h-0 overflow-auto pr-1 scroll-fade">
@@ -523,6 +523,7 @@ import {
   FolderKanban,
   ListTodo,
   BookOpen,
+  PieChart,
   MessageSquare
 } from 'lucide-vue-next';
 import BoardView from './modules/board/BoardView.vue';
@@ -541,6 +542,7 @@ const SquareIcon = Square;
 const CloseIcon = X;
 const TerminalIcon = Terminal;
 const AllCardsIcon = LayoutGrid;
+const BoardIcon = PieChart;
 const CollectionsIcon = FolderKanban;
 const TasksIcon = ListTodo;
 const LibraryIcon = BookOpen;
