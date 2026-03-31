@@ -49,6 +49,14 @@
           </button>
           <button
             class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
+            :class="activePage === 'qa' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
+            @click="activePage = 'qa'; store.selectedCollectionId = null"
+          >
+            <QaIcon class="h-4 w-4" />
+            问答
+          </button>
+          <button
+            class="w-full text-left px-3 py-2 rounded-md flex items-center gap-2"
             :class="activePage === 'cards' && !store.selectedCollectionId ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'"
             @click="activePage = 'cards'; store.selectedCollectionId = null"
           >
@@ -193,6 +201,26 @@
                   </div>
                 </article>
               </section>
+            </div>
+          </main>
+          <main v-else-if="activePage === 'qa'" class="h-full min-h-0 flex flex-col gap-3">
+            <div class="qa-display">
+              <p v-if="!qaCaveLines.length" class="qa-line qa-line-empty">暂无内容</p>
+              <p v-for="(line, index) in qaCaveLines" :key="`qa-line-${index}`" class="qa-line">
+                {{ line }}
+              </p>
+            </div>
+            <div class="qa-chat-shell">
+              <textarea
+                v-model="qaInput"
+                class="qa-chat-input"
+                placeholder="输入内容..."
+                rows="3"
+                @keydown.enter.exact.prevent="sendQaInput"
+              />
+              <button class="qa-chat-send" type="button" :disabled="qaLoading" @click="sendQaInput">
+                {{ qaLoading ? '发送中' : '发送' }}
+              </button>
             </div>
           </main>
           <main v-else-if="activePage === 'cards'" class="relative h-full flex flex-col min-h-0">
@@ -682,6 +710,29 @@
                   </div>
                 </div>
               </div>
+              <div class="pt-2 border-t border-slate-200/80 space-y-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-slate-700">Qwen 问答配置</h3>
+                  <p class="text-xs text-slate-400">保存后无需每次手动设置环境变量</p>
+                </div>
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-500">API Key</label>
+                  <div class="flex items-center gap-2">
+                    <input v-model="settingsForm.qwenApiKey" class="input" type="password" placeholder="sk-..." />
+                    <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
+                      <CheckIcon class="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-500">Base URL</label>
+                  <input v-model="settingsForm.qwenBaseURL" class="input" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
+                </div>
+                <div class="space-y-1">
+                  <label class="text-xs text-slate-500">Model</label>
+                  <input v-model="settingsForm.qwenModel" class="input" placeholder="qwen-plus" />
+                </div>
+              </div>
               <div class="flex justify-end"></div>
             </div>
           </main>
@@ -942,7 +993,8 @@ import {
   BrushCleaning,
   LayoutGrid,
   FolderKanban,
-  ListTodo
+  ListTodo,
+  MessageSquare
 } from 'lucide-vue-next';
 import { useDataStore } from './modules/terminal/terminalStore';
 
@@ -968,13 +1020,24 @@ const BroomIcon = BrushCleaning;
 const AllCardsIcon = LayoutGrid;
 const CollectionsIcon = FolderKanban;
 const TasksIcon = ListTodo;
+const QaIcon = MessageSquare;
 
 const store = useDataStore();
 const activePage = ref('board');
 const logoAnimSeed = ref(0);
 const fabAnimKey = ref(0);
 const logCollapsed = ref(false);
-const settingsForm = reactive({ cmd: 'cmd.exe', ps: 'powershell.exe', bash: 'bash' });
+const qaInput = ref('');
+const qaCaveLines = ref([]);
+const qaLoading = ref(false);
+const settingsForm = reactive({
+  cmd: 'cmd.exe',
+  ps: 'powershell.exe',
+  bash: 'bash',
+  qwenApiKey: '',
+  qwenBaseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  qwenModel: 'qwen-plus'
+});
 const toast = reactive({ show: false, message: '', tone: 'info' });
 const selectedForCollection = ref([]);
 const selectedCollections = ref([]);
@@ -1001,6 +1064,30 @@ let boardSourceChart = null;
 
 function playLogoAnimation() {
   logoAnimSeed.value += 1;
+}
+
+async function sendQaInput() {
+  const text = qaInput.value.trim();
+  if (!text || qaLoading.value) return;
+  qaInput.value = '';
+  qaLoading.value = true;
+  qaCaveLines.value = [`你：${text}`, '答：思考中...'];
+  try {
+    if (!window.terminalHelper || typeof window.terminalHelper.askQa !== 'function') {
+      throw new Error('问答接口不可用');
+    }
+    const result = await window.terminalHelper.askQa(text);
+    if (!result || !result.ok) {
+      throw new Error((result && result.error) || '问答失败');
+    }
+    qaCaveLines.value = [`你：${text}`, `答：${result.answer || '（空回复）'}`];
+  } catch (error) {
+    const message = error && error.message ? error.message : '问答失败';
+    qaCaveLines.value = [`你：${text}`, `答：${message}`];
+    showToast(message, 'error');
+  } finally {
+    qaLoading.value = false;
+  }
 }
 
 const boardTone = Object.freeze({
@@ -1821,9 +1908,13 @@ function showToast(message, tone = 'info') {
 
 function syncSettingsForm() {
   const paths = store.settings?.shellPaths || {};
+  const qwen = store.settings?.qwen || {};
   settingsForm.cmd = paths.cmd || 'cmd.exe';
   settingsForm.ps = paths.ps || 'powershell.exe';
   settingsForm.bash = paths.bash || 'bash';
+  settingsForm.qwenApiKey = typeof qwen.apiKey === 'string' ? qwen.apiKey : '';
+  settingsForm.qwenBaseURL = qwen.baseURL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+  settingsForm.qwenModel = qwen.model || 'qwen-plus';
 }
 
 async function detectShell(kind) {
@@ -1861,11 +1952,26 @@ async function applyShell(kind) {
   showToast(`${label} 路径已应用`, 'success');
 }
 
+function applyQwenSettings() {
+  store.settings.qwen = {
+    apiKey: (settingsForm.qwenApiKey || '').trim(),
+    baseURL: (settingsForm.qwenBaseURL || '').trim() || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: (settingsForm.qwenModel || '').trim() || 'qwen-plus'
+  };
+  store.persist();
+  showToast('Qwen 配置已保存', 'success');
+}
+
 function saveSettings() {
   store.settings.shellPaths = {
     cmd: settingsForm.cmd.trim() || 'cmd.exe',
     ps: settingsForm.ps.trim() || 'powershell.exe',
     bash: settingsForm.bash.trim() || 'bash'
+  };
+  store.settings.qwen = {
+    apiKey: (settingsForm.qwenApiKey || '').trim(),
+    baseURL: (settingsForm.qwenBaseURL || '').trim() || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: (settingsForm.qwenModel || '').trim() || 'qwen-plus'
   };
   store.persist();
 }

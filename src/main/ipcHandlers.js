@@ -1,9 +1,10 @@
-const { ipcMain, dialog, BrowserWindow, app } = require('electron');
+﻿const { ipcMain, dialog, BrowserWindow, app } = require('electron');
 const { spawn, spawnSync } = require('child_process');
 const pty = require('node-pty');
 const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
+const OpenAI = require('openai');
 const store = require('./store');
 const iconv = require('iconv-lite');
 
@@ -59,6 +60,111 @@ function getShellPaths() {
     ps: paths.ps || 'powershell.exe',
     bash: paths.bash || 'bash'
   };
+}
+
+function getQwenSettings() {
+  const data = store.getAll();
+  const qwen = data && data.settings && data.settings.qwen ? data.settings.qwen : {};
+  return {
+    apiKey: typeof qwen.apiKey === 'string' ? qwen.apiKey.trim() : '',
+    baseURL:
+      (typeof qwen.baseURL === 'string' && qwen.baseURL.trim()) ||
+      'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model:
+      (typeof qwen.model === 'string' && qwen.model.trim()) ||
+      'qwen-plus'
+  };
+}
+
+const QWEN_SQL_SYSTEM_PROMPT = `You are "DumbOx SQL assistant".
+Use only these tables and columns:
+1) word_frequency_stats(id, word, count, created_at)
+2) land_news_analysis(id, url, title, publish_date, source, content_summary, sentiment_score, keywords, created_at)
+
+Rules:
+- Generate exactly one MySQL SELECT statement.
+- Never generate UPDATE, DELETE, INSERT, DROP, ALTER, TRUNCATE, CREATE, REPLACE.
+- Only query the two tables above.
+- If user request is unrelated to these tables, return exactly this sentence:
+老牛在田里转了一圈，没发现相关数据。
+- Output either SQL code block or the fixed sentence above. No extra explanation.`;
+
+const QWEN_SUMMARY_SYSTEM_PROMPT = `You are DumbOx data analyst.
+Given user question + executed SQL + SQL result rows, provide concise Chinese summary:
+- First line: direct conclusion.
+- Then 1-3 key observations.
+- Do not fabricate numbers.
+- If result set is empty, clearly say: 未查到匹配数据。`;
+
+const QWEN_NO_DATA_TEXT = '老牛在田里转了一圈，没发现相关数据。';
+const ALLOWED_QUERY_TABLES = new Set(['word_frequency_stats', 'land_news_analysis']);
+
+function extractCompletionText(completion) {
+  const answerRaw = completion && completion.choices && completion.choices[0] && completion.choices[0].message
+    ? completion.choices[0].message.content
+    : '';
+  return Array.isArray(answerRaw)
+    ? answerRaw.map((item) => (typeof item === 'string' ? item : item && item.text ? item.text : '')).join('\n').trim()
+    : String(answerRaw || '').trim();
+}
+
+function extractSqlFromModelText(text) {
+  const source = String(text || '').trim();
+  const fenceMatch = source.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+  if (fenceMatch && fenceMatch[1]) return fenceMatch[1].trim();
+  return source.replace(/^sql\s*[:\uFF1A]/i, '').trim();
+}
+
+function validateSelectSql(sql) {
+  const original = String(sql || '').trim();
+  if (!original) return { ok: false, error: '未生成 SQL' };
+  if (/--|\/\*/.test(original)) return { ok: false, error: 'SQL 包含注释，已拒绝执行' };
+  const semicolonCount = (original.match(/;/g) || []).length;
+  if (semicolonCount > 1 || (semicolonCount === 1 && !/;\s*$/.test(original))) {
+    return { ok: false, error: '仅允许单条 SQL' };
+  }
+
+  const normalized = original.replace(/;+\s*$/, '').trim();
+  if (!/^select\b/i.test(normalized)) return { ok: false, error: '仅允许 SELECT 查询' };
+  if (/\b(update|delete|insert|drop|alter|truncate|create|replace|grant|revoke)\b/i.test(normalized)) {
+    return { ok: false, error: 'SQL 包含危险关键字，已拒绝执行' };
+  }
+
+  const tableMatches = [];
+  const tableRegex = /\b(?:from|join)\s+((?:`[^`]+`|\w+)(?:\.(?:`[^`]+`|\w+))?)/gi;
+  let match = tableRegex.exec(normalized);
+  while (match) {
+    tableMatches.push(match[1]);
+    match = tableRegex.exec(normalized);
+  }
+  if (!tableMatches.length) return { ok: false, error: 'SQL 未包含可识别的数据表' };
+
+  for (const rawTable of tableMatches) {
+    const table = rawTable
+      .split('.')
+      .pop()
+      .replace(/`/g, '')
+      .trim()
+      .toLowerCase();
+    if (!ALLOWED_QUERY_TABLES.has(table)) {
+      return { ok: false, error: `不允许访问表：${table}` };
+    }
+  }
+  return { ok: true, sql: normalized };
+}
+
+function attachDefaultLimit(sql, limit = 200) {
+  if (/\blimit\s+\d+/i.test(sql)) return sql;
+  return `${sql}\nLIMIT ${limit}`;
+}
+
+function stringifyRowsForPrompt(rows, maxRows = 120, maxChars = 30000) {
+  const clippedRows = Array.isArray(rows) ? rows.slice(0, maxRows) : [];
+  let text = JSON.stringify(clippedRows, null, 2);
+  if (text.length > maxChars) {
+    text = `${text.slice(0, maxChars)}\n...(truncated)`;
+  }
+  return text;
 }
 
 function detectShellPaths() {
@@ -391,6 +497,85 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('qa:ask', async (event, payload) => {
+    try {
+      const question = payload && typeof payload.question === 'string' ? payload.question.trim() : '';
+      if (!question) {
+        return { ok: false, error: '问题不能为空' };
+      }
+
+      const qwenSettings = getQwenSettings();
+      const apiKey = qwenSettings.apiKey || process.env.DASHSCOPE_API_KEY;
+      if (!apiKey) {
+        return { ok: false, error: '未配置 API Key，请在牛棚配置中填写 Qwen API Key' };
+      }
+      const baseURL =
+        (payload && typeof payload.baseURL === 'string' && payload.baseURL.trim()) ||
+        qwenSettings.baseURL ||
+        process.env.DASHSCOPE_BASE_URL ||
+        'https://dashscope.aliyuncs.com/compatible-mode/v1';
+      const model =
+        (payload && typeof payload.model === 'string' && payload.model.trim()) ||
+        qwenSettings.model ||
+        process.env.DASHSCOPE_MODEL ||
+        'qwen-plus';
+
+      const client = new OpenAI({ apiKey, baseURL });
+      const sqlCompletion = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: QWEN_SQL_SYSTEM_PROMPT },
+          { role: 'user', content: question }
+        ]
+      });
+
+      const sqlOutput = extractCompletionText(sqlCompletion);
+      if (!sqlOutput) {
+        return { ok: false, error: '模型未返回 SQL' };
+      }
+      if (sqlOutput.includes(QWEN_NO_DATA_TEXT)) {
+        return { ok: true, answer: QWEN_NO_DATA_TEXT };
+      }
+
+      const sqlCandidate = extractSqlFromModelText(sqlOutput);
+      const sqlCheck = validateSelectSql(sqlCandidate);
+      if (!sqlCheck.ok) {
+        return { ok: false, error: `SQL 校验失败：${sqlCheck.error}` };
+      }
+
+      const executableSql = attachDefaultLimit(sqlCheck.sql);
+      const pool = getBoardDbPool();
+      const [rows] = await pool.query(executableSql);
+      const rowCount = Array.isArray(rows) ? rows.length : 0;
+      const rowsText = stringifyRowsForPrompt(rows);
+
+      const summaryCompletion = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: QWEN_SUMMARY_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content:
+              `用户问题：${question}\n\n` +
+              `已执行SQL：\n${executableSql}\n\n` +
+              `查询结果行数：${rowCount}\n` +
+              `查询结果(JSON)：\n${rowsText}`
+          }
+        ]
+      });
+
+      const answer = extractCompletionText(summaryCompletion);
+      return {
+        ok: true,
+        answer: answer || (rowCount ? '查询完成，但模型未返回总结文本。' : '未查到匹配数据。'),
+        sql: executableSql,
+        rowCount
+      };
+    } catch (error) {
+      const message = error && error.message ? error.message : '问答请求失败';
+      return { ok: false, error: message };
+    }
+  });
   ipcMain.handle('settings:detect-shells', () => {
     return detectShellPaths();
   });
@@ -722,6 +907,7 @@ function registerIpcHandlers() {
 }
 
 module.exports = { registerIpcHandlers };
+
 
 
 

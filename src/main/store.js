@@ -13,6 +13,11 @@ const defaults = {
       cmd: 'cmd.exe',
       ps: 'powershell.exe',
       bash: 'bash'
+    },
+    qwen: {
+      apiKey: '',
+      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      model: 'qwen-plus'
     }
   }
 };
@@ -65,13 +70,26 @@ function ensureDataFile() {
 }
 
 function normalize(data) {
+  const shellPaths = data?.settings?.shellPaths || {};
+  const qwen = data?.settings?.qwen || {};
   return {
     cards: Array.isArray(data?.cards) ? data.cards : [],
     collections: Array.isArray(data?.collections) ? data.collections : [],
     tasks: Array.isArray(data?.tasks) ? data.tasks : [],
     taskRunLogs: Array.isArray(data?.taskRunLogs) ? data.taskRunLogs : [],
     runLogs: Array.isArray(data?.runLogs) ? data.runLogs : [],
-    settings: data?.settings || defaults.settings
+    settings: {
+      shellPaths: {
+        cmd: shellPaths.cmd || defaults.settings.shellPaths.cmd,
+        ps: shellPaths.ps || defaults.settings.shellPaths.ps,
+        bash: shellPaths.bash || defaults.settings.shellPaths.bash
+      },
+      qwen: {
+        apiKey: typeof qwen.apiKey === 'string' ? qwen.apiKey : defaults.settings.qwen.apiKey,
+        baseURL: qwen.baseURL || defaults.settings.qwen.baseURL,
+        model: qwen.model || defaults.settings.qwen.model
+      }
+    }
   };
 }
 

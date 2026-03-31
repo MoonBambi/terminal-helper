@@ -46,6 +46,11 @@ export const useDataStore = defineStore('data', {
         cmd: 'cmd.exe',
         ps: 'powershell.exe',
         bash: 'bash'
+      },
+      qwen: {
+        apiKey: '',
+        baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        model: 'qwen-plus'
       }
     },
     selectedCollectionId: null,
@@ -80,7 +85,20 @@ export const useDataStore = defineStore('data', {
     async load() {
       const data = await window.terminalHelper.getData();
       this.cards = Array.isArray(data.cards) ? data.cards : [];
-      this.settings = data.settings || this.settings;
+      const shellPaths = data?.settings?.shellPaths || {};
+      const qwen = data?.settings?.qwen || {};
+      this.settings = {
+        shellPaths: {
+          cmd: shellPaths.cmd || 'cmd.exe',
+          ps: shellPaths.ps || 'powershell.exe',
+          bash: shellPaths.bash || 'bash'
+        },
+        qwen: {
+          apiKey: typeof qwen.apiKey === 'string' ? qwen.apiKey : '',
+          baseURL: qwen.baseURL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          model: qwen.model || 'qwen-plus'
+        }
+      };
       this.cards.forEach((card) => {
         if (!card.shell) {
           const tags = Array.isArray(card.tags) ? card.tags.map((t) => t.toLowerCase()) : [];
