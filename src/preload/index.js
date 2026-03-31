@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('terminalHelper', {
   importData: () => ipcRenderer.invoke('data:import'),
   importDataRaw: () => ipcRenderer.invoke('data:import-raw'),
   fetchBoardData: () => ipcRenderer.invoke('board:fetch-data'),
+  fetchLibraryData: (payload) => ipcRenderer.invoke('library:fetch', payload),
   askQa: (question, options) => ipcRenderer.invoke('qa:ask', { question, ...(options || {}) }),
   detectShellPaths: () => ipcRenderer.invoke('settings:detect-shells'),
   validateShellPath: (path) => ipcRenderer.invoke('settings:validate-path', path),

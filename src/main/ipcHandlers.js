@@ -497,6 +497,87 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('library:fetch', async (event, payload) => {
+    try {
+      const page = Math.max(1, Number(payload && payload.page) || 1);
+      const pageSize = Math.min(Math.max(1, Number(payload && payload.pageSize) || 20), 50);
+      const query = payload && typeof payload.query === 'string' ? payload.query.trim() : '';
+      const offset = (page - 1) * pageSize;
+      let whereSql = '';
+      const params = [];
+      if (query) {
+        const like = `%${query}%`;
+        whereSql =
+          'WHERE title LIKE ? OR source LIKE ? OR content_summary LIKE ? OR url LIKE ? OR JSON_SEARCH(keywords, \'one\', ?) IS NOT NULL';
+        params.push(like, like, like, like, query);
+      }
+
+      const pool = getBoardDbPool();
+      const [countRows] = await pool.query(
+        `SELECT COUNT(*) AS total FROM land_news_analysis ${whereSql}`,
+        params
+      );
+      const total = Array.isArray(countRows) && countRows[0] ? Number(countRows[0].total || 0) : 0;
+
+      const [rows] = await pool.query(
+        `
+          SELECT
+            id,
+            url,
+            title,
+            publish_date,
+            source,
+            content_summary,
+            sentiment_score,
+            keywords,
+            created_at
+          FROM land_news_analysis
+          ${whereSql}
+          ORDER BY publish_date DESC, id DESC
+          LIMIT ? OFFSET ?
+        `,
+        [...params, pageSize, offset]
+      );
+
+      const items = Array.isArray(rows)
+        ? rows.map((row) => {
+            let keywords = [];
+            if (Array.isArray(row.keywords)) {
+              keywords = row.keywords;
+            } else if (typeof row.keywords === 'string' && row.keywords.trim()) {
+              try {
+                const parsed = JSON.parse(row.keywords);
+                keywords = Array.isArray(parsed) ? parsed : [];
+              } catch (err) {
+                keywords = [];
+              }
+            }
+            return {
+              id: row.id,
+              url: row.url || '',
+              title: row.title || '',
+              publish_date: row.publish_date ? String(row.publish_date).slice(0, 10) : '',
+              source: row.source || '未知来源',
+              content_summary: row.content_summary || '',
+              sentiment_score: Number(row.sentiment_score || 0),
+              keywords,
+              created_at: row.created_at ? String(row.created_at).slice(0, 19) : ''
+            };
+          })
+        : [];
+
+      return {
+        ok: true,
+        items,
+        total,
+        page,
+        pageSize
+      };
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : '数据库连接失败' };
+    }
+  });
+
   ipcMain.handle('qa:ask', async (event, payload) => {
     try {
       const question = payload && typeof payload.question === 'string' ? payload.question.trim() : '';
