@@ -24,17 +24,15 @@
           <span class="card-chip">{{ collectionStopAction.useDedicatedTerminal ? '新终端' : '同终端' }}</span>
         </div>
         <div class="mt-auto flex items-center justify-center gap-3">
-          <button class="icon-btn" @click="openStopActionEditor" title="编辑停止">
+          <BaseIconButton @click="openStopActionEditor" title="Edit Stop">
             <PencilIcon class="h-4 w-4" />
-          </button>
-          <button
-            v-if="store.selectedCollection && isCollectionRunning(store.selectedCollection.id)"
-            class="icon-btn icon-btn-danger"
+          </BaseIconButton>
+          <BaseIconButton v-if="store.selectedCollection && isCollectionRunning(store.selectedCollection.id)" tone="danger"
             @click="stopActiveRun"
             title="执行停止"
           >
             <SquareIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
       <div
@@ -76,35 +74,31 @@
           <span class="card-chip uppercase">{{ entry.card.shell || 'cmd' }}</span>
         </div>
         <div class="mt-auto flex items-center justify-center gap-3">
-          <button
-            v-if="isCardRunning(entry.card.id)"
-            class="icon-btn icon-btn-danger"
+          <BaseIconButton v-if="isCardRunning(entry.card.id)" tone="danger"
             @click="stopActiveRun"
             title="停止"
           >
             <SquareIcon class="h-4 w-4" />
-          </button>
-          <button v-else class="icon-btn icon-btn-primary" @click="confirmRunCard(entry.card)" title="执行">
+          </BaseIconButton>
+          <BaseIconButton v-else tone="primary" @click="confirmRunCard(entry.card)" title="Run">
             <PlayIcon class="h-4 w-4" />
-          </button>
-          <button
-            class="icon-btn"
-            :class="isCardSelected(entry.card.id, entry.index) ? 'icon-btn-selected' : ''"
+          </BaseIconButton>
+          <BaseIconButton :selected="isCardSelected(entry.card.id, entry.index)"
             @click="toggleSelectForCollection(entry.card.id, entry.index)"
             title="选中"
           >
             <CheckCircleIcon v-if="isCardSelected(entry.card.id, entry.index)" class="h-4 w-4" />
             <CircleIcon v-else class="h-4 w-4" />
-          </button>
-          <button class="icon-btn" @click="openCardModal(entry.card)" title="编辑">
+          </BaseIconButton>
+          <BaseIconButton @click="openCardModal(entry.card)" title="Edit">
             <PencilIcon class="h-4 w-4" />
-          </button>
-          <button class="icon-btn" @click="handleDuplicateCard(entry.card, entry.index)" title="复制">
+          </BaseIconButton>
+          <BaseIconButton @click="handleDuplicateCard(entry.card, entry.index)" title="Duplicate">
             <CopyIcon class="h-4 w-4" />
-          </button>
-          <button class="icon-btn icon-btn-danger" @click="confirmDeleteCard(entry.card, entry.index)" title="删除">
+          </BaseIconButton>
+          <BaseIconButton tone="danger" @click="confirmDeleteCard(entry.card, entry.index)" title="Delete">
             <TrashIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
     </div>
@@ -115,20 +109,15 @@
   >
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <button class="icon-btn" @click="onToggleLogCollapsed" title="折叠/展开">
+        <BaseIconButton @click="onToggleLogCollapsed" title="Toggle History">
           <ChevronDownIcon class="h-4 w-4 transition-transform" :class="logCollapsed ? '-rotate-90' : ''" />
-        </button>
+        </BaseIconButton>
         <h2 class="text-sm font-semibold text-slate-700">历史运行记录</h2>
       </div>
       <div class="flex items-center gap-1">
-        <button
-          class="icon-btn"
-          :class="isCollectionHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''"
-          @click="clearCollectionHistoryLogs"
-          title="清理历史"
-        >
+        <BaseIconButton :extra-class="isCollectionHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''" @click="clearCollectionHistoryLogs" title="Clear History">
           <BroomIcon class="h-4 w-4" />
-        </button>
+        </BaseIconButton>
         <span class="text-xs text-slate-500">{{ collectionHistoryLogs.length }} 条</span>
       </div>
     </div>
@@ -228,6 +217,7 @@ import {
   Plus,
   BrushCleaning
 } from 'lucide-vue-next';
+import BaseIconButton from '../../components/base/BaseIconButton.vue';
 
 const PlayIcon = Play;
 const PencilIcon = Pencil;

@@ -29,23 +29,23 @@
             <p class="text-xs mt-0.5" :class="taskProgressTone(task.id)">{{ taskProgressText(task.id) }}</p>
           </div>
           <div class="flex items-center gap-2">
-            <button
-              class="icon-btn icon-btn-primary"
-              :class="isRunActive || isTaskRunning(task.id) ? 'opacity-40 pointer-events-none' : ''"
+            <BaseIconButton
+              tone="primary"
+              :extra-class="isRunActive || isTaskRunning(task.id) ? 'opacity-40 pointer-events-none' : ''"
               @click="runTask(task)"
-              title="运行任务"
+              title="Run Task"
             >
               <PlayIcon class="h-4 w-4" />
-            </button>
-            <button class="icon-btn" @click="openTaskModal(task)" title="编辑">
+            </BaseIconButton>
+            <BaseIconButton @click="openTaskModal(task)" title="编辑">
               <PencilIcon class="h-4 w-4" />
-            </button>
-            <button class="icon-btn" @click="store.duplicateTask(task)" title="复制">
+            </BaseIconButton>
+            <BaseIconButton @click="store.duplicateTask(task)" title="复制">
               <CopyIcon class="h-4 w-4" />
-            </button>
-            <button class="icon-btn icon-btn-danger" @click="confirmDeleteTask(task)" title="删除">
+            </BaseIconButton>
+            <BaseIconButton tone="danger" @click="confirmDeleteTask(task)" title="删除">
               <TrashIcon class="h-4 w-4" />
-            </button>
+            </BaseIconButton>
           </div>
         </div>
         <div v-if="taskCompletedBadges(task.id).length" class="task-complete-badges">
@@ -72,20 +72,15 @@
     >
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-1">
-          <button class="icon-btn" @click="onToggleTaskHistoryCollapsed" title="折叠/展开">
+          <BaseIconButton @click="onToggleTaskHistoryCollapsed" title="折叠/展开">
             <ChevronDownIcon class="h-4 w-4 transition-transform" :class="taskHistoryCollapsed ? '-rotate-90' : ''" />
-          </button>
+          </BaseIconButton>
           <h2 class="text-sm font-semibold text-slate-700">任务历史记录</h2>
         </div>
         <div class="flex items-center gap-1">
-          <button
-            class="icon-btn"
-            :class="isTaskHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''"
-            @click="clearTaskHistoryLogs"
-            title="清理历史"
-          >
+          <BaseIconButton :extra-class="isTaskHistoryClearDisabled ? 'opacity-40 pointer-events-none' : ''" @click="clearTaskHistoryLogs" title="Clear History">
             <BroomIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
           <span class="text-xs text-slate-500">{{ taskHistoryLogs.length }} 条</span>
         </div>
       </div>
@@ -136,6 +131,7 @@ import {
   BrushCleaning,
   ListTodo
 } from 'lucide-vue-next';
+import BaseIconButton from '../../components/base/BaseIconButton.vue';
 
 const PlayIcon = Play;
 const PencilIcon = Pencil;

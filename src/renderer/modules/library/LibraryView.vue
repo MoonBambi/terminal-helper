@@ -49,13 +49,13 @@
     <div class="library-footer">
       <div class="library-count">共 {{ libraryTotal }} 条</div>
       <div class="library-pager">
-        <button class="icon-btn" :disabled="libraryPage <= 1" @click="onPageChange(libraryPage - 1)" title="上一页">
+        <BaseIconButton :disabled="libraryPage <= 1" @click="onPageChange(libraryPage - 1)" title="Previous Page">
           <ChevronLeftIcon class="h-4 w-4" />
-        </button>
+        </BaseIconButton>
         <span class="library-page">第 {{ libraryPage }} / {{ libraryTotalPages }} 页</span>
-        <button class="icon-btn" :disabled="libraryPage >= libraryTotalPages" @click="onPageChange(libraryPage + 1)" title="下一页">
+        <BaseIconButton :disabled="libraryPage >= libraryTotalPages" @click="onPageChange(libraryPage + 1)" title="Next Page">
           <ChevronRightIcon class="h-4 w-4" />
-        </button>
+        </BaseIconButton>
       </div>
     </div>
   </section>
@@ -63,6 +63,7 @@
 
 <script setup>
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import BaseIconButton from '../../components/base/BaseIconButton.vue';
 
 const ChevronLeftIcon = ChevronLeft;
 const ChevronRightIcon = ChevronRight;

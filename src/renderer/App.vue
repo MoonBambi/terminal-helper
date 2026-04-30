@@ -219,7 +219,6 @@
               :selected-collections="selectedCollections"
               :open-collection-modal="openCollectionModal"
               :confirm-delete-collection="confirmDeleteCollection"
-              :selected-count="selectedCount"
               :selected-collection-count="selectedCollectionCount"
               :confirm-delete-selected-collections="confirmDeleteSelectedCollections"
               :import-data="importData"

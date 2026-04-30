@@ -9,27 +9,27 @@
         <label class="text-xs text-slate-500">CMD 路径</label>
         <div class="flex items-center gap-2">
           <input v-model="settingsForm.cmd" class="input" placeholder="例如 C:\\Windows\\System32\\cmd.exe" />
-          <button class="icon-btn icon-btn-check" title="应用并检测 CMD 路径" @click="applyShell('cmd')">
+          <BaseIconButton tone="check" title="应用并检测 CMD 路径" @click="applyShell('cmd')">
             <CheckIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">PowerShell 路径</label>
         <div class="flex items-center gap-2">
           <input v-model="settingsForm.ps" class="input" placeholder="例如 C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" />
-          <button class="icon-btn icon-btn-check" title="应用并检测 PowerShell 路径" @click="applyShell('ps')">
+          <BaseIconButton tone="check" title="应用并检测 PowerShell 路径" @click="applyShell('ps')">
             <CheckIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">Bash 路径</label>
         <div class="flex items-center gap-2">
           <input v-model="settingsForm.bash" class="input" placeholder="例如 C:\\Program Files\\Git\\bin\\bash.exe" />
-          <button class="icon-btn icon-btn-check" title="应用并检测 Bash 路径" @click="applyShell('bash')">
+          <BaseIconButton tone="check" title="应用并检测 Bash 路径" @click="applyShell('bash')">
             <CheckIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
     </div>
@@ -41,27 +41,27 @@
         <label class="text-xs text-slate-500">API Key</label>
         <div class="flex items-center gap-2">
           <input v-model="settingsForm.qwenApiKey" class="input" type="password" placeholder="sk-..." />
-          <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
+          <BaseIconButton tone="check" title="保存 Qwen 配置" @click="applyQwenSettings">
             <CheckIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">Base URL</label>
         <div class="flex items-center gap-2">
           <input v-model="settingsForm.qwenBaseURL" class="input" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
-          <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
+          <BaseIconButton tone="check" title="保存 Qwen 配置" @click="applyQwenSettings">
             <CheckIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
       <div class="space-y-1">
         <label class="text-xs text-slate-500">Model</label>
         <div class="flex items-center gap-2">
           <input v-model="settingsForm.qwenModel" class="input" placeholder="qwen-plus" />
-          <button class="icon-btn icon-btn-check" title="保存 Qwen 配置" @click="applyQwenSettings">
+          <BaseIconButton tone="check" title="保存 Qwen 配置" @click="applyQwenSettings">
             <CheckIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
     </div>
@@ -71,6 +71,7 @@
 
 <script setup>
 import { Check } from 'lucide-vue-next';
+import BaseIconButton from '../../components/base/BaseIconButton.vue';
 
 const CheckIcon = Check;
 

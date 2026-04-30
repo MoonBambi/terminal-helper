@@ -21,25 +21,25 @@
         class="flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <button class="icon-btn" @click="toggleCollectionSelection(collection.id)" title="选择集合">
+          <BaseIconButton @click="toggleCollectionSelection(collection.id)" title="选择集合">
             <CheckCircleIcon v-if="selectedCollections.includes(collection.id)" class="h-4 w-4 text-indigo-600" />
             <CircleIcon v-else class="h-4 w-4 text-slate-400" />
-          </button>
+          </BaseIconButton>
           <div class="min-w-0">
             <p class="text-sm font-medium text-slate-700 truncate">{{ collection.name }}</p>
             <p class="text-xs text-slate-400">{{ collection.cardIds.length }} 张卡片</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button class="icon-btn" @click="openCollectionModal(collection)" title="编辑">
+          <BaseIconButton @click="openCollectionModal(collection)" title="编辑">
             <PencilIcon class="h-4 w-4" />
-          </button>
-          <button class="icon-btn" @click="store.duplicateCollection(collection)" title="复制">
+          </BaseIconButton>
+          <BaseIconButton @click="store.duplicateCollection(collection)" title="复制">
             <CopyIcon class="h-4 w-4" />
-          </button>
-          <button class="icon-btn icon-btn-danger" @click="confirmDeleteCollection(collection)" title="删除">
+          </BaseIconButton>
+          <BaseIconButton tone="danger" @click="confirmDeleteCollection(collection)" title="删除">
             <TrashIcon class="h-4 w-4" />
-          </button>
+          </BaseIconButton>
         </div>
       </div>
       <div v-if="filteredCollections.length === 0" class="text-sm text-slate-400 py-6 text-center">
@@ -50,7 +50,7 @@
   <div class="fab-group" :key="`fab-collections-${activePage}-${fabAnimKey}`">
     <button class="fab fab-bounce relative" @click="openCollectionModal()" title="新建集合">
       <FolderPlusIcon class="h-5 w-5" />
-      <span v-if="selectedCount" class="fab-badge">{{ selectedCount }}</span>
+      <span v-if="selectedCollectionCount" class="fab-badge">{{ selectedCollectionCount }}</span>
     </button>
     <button
       class="fab fab-danger fab-bounce relative"
@@ -81,6 +81,7 @@ import {
   Import,
   Upload
 } from 'lucide-vue-next';
+import BaseIconButton from '../../components/base/BaseIconButton.vue';
 
 const PencilIcon = Pencil;
 const CopyIcon = Copy;
@@ -100,7 +101,6 @@ defineProps({
   selectedCollections: { type: Array, default: () => [] },
   openCollectionModal: { type: Function, required: true },
   confirmDeleteCollection: { type: Function, required: true },
-  selectedCount: { type: Number, default: 0 },
   selectedCollectionCount: { type: Number, default: 0 },
   confirmDeleteSelectedCollections: { type: Function, required: true },
   importData: { type: Function, required: true },
