@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -1109,6 +1109,131 @@ textarea.input {
 .qa-chat-send:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.qa-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.qa-decision-card {
+  width: 90%;
+  justify-self: start;
+  aspect-ratio: auto;
+  min-height: 180px;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.qa-decision-title {
+  margin: 0;
+  font-size: 16px;
+  color: #1e293b;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.qa-decision-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #475569;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.qa-card-question {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.qa-card-question .qa-decision-title {
+  color: #3730a3;
+}
+
+.qa-card-conclusion {
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+}
+
+.qa-card-conclusion .qa-decision-title {
+  color: #065f46;
+}
+
+.qa-card-evidence {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.qa-card-evidence .qa-decision-title {
+  color: #1d4ed8;
+}
+
+.qa-card-action {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.qa-card-action .qa-decision-title {
+  color: #c2410c;
+}
+
+.qa-card-risk {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.qa-card-risk .qa-decision-title {
+  color: #be123c;
+}
+
+.qa-card-confidence {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.qa-card-confidence .qa-decision-title {
+  color: #334155;
+}
+
+.qa-trace-card {
+  margin-top: 10px;
+  border: 1px solid rgba(129, 140, 248, 0.22);
+  border-radius: 12px;
+  background: rgba(243, 246, 255, 0.88);
+  padding: 10px 12px;
+}
+
+.qa-trace-line {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.qa-trace-key {
+  color: #334155;
+  font-weight: 600;
+}
+
+.qa-trace-value {
+  color: #475569;
+}
+
+.qa-trace-sql {
+  margin: 0;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .library-panel {

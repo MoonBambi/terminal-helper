@@ -160,6 +160,10 @@
           <main v-else-if="activePage === 'qa'" class="h-full min-h-0 flex flex-col gap-3">
             <QaView
               :qa-cave-lines="qaCaveLines"
+              :qa-question="qaQuestion"
+              :qa-decision="qaDecision"
+              :qa-trace-sql="qaTraceSql"
+              :qa-time-range="qaTimeRange"
               :qa-input="qaInput"
               :qa-loading="qaLoading"
               :on-input="updateQaInput"
@@ -555,6 +559,16 @@ const fabAnimKey = ref(0);
 const logCollapsed = ref(false);
 const qaInput = ref('');
 const qaCaveLines = ref([]);
+const qaQuestion = ref('');
+const qaDecision = ref({
+  conclusion: '',
+  evidence: '',
+  action: '',
+  risk: '',
+  confidence: ''
+});
+const qaTraceSql = ref('');
+const qaTimeRange = ref('');
 const qaLoading = ref(false);
 const libraryItems = ref([]);
 const libraryQuery = ref('');
@@ -611,12 +625,74 @@ function playLogoAnimation() {
   logoAnimSeed.value += 1;
 }
 
+function createEmptyQaDecision() {
+  return {
+    conclusion: '',
+    evidence: '',
+    action: '',
+    risk: '',
+    confidence: ''
+  };
+}
+
+function parseQaDecision(answerText) {
+  const text = String(answerText || '').trim();
+  const decision = createEmptyQaDecision();
+  if (!text) return decision;
+
+  const labelMap = [
+    { keys: ['结论'], field: 'conclusion' },
+    { keys: ['证据'], field: 'evidence' },
+    { keys: ['建议动作', '行动建议', '建议'], field: 'action' },
+    { keys: ['风险等级', '风险'], field: 'risk' },
+    { keys: ['置信度', '可信度'], field: 'confidence' }
+  ];
+
+  const allKeys = labelMap.flatMap((item) => item.keys).join('|');
+  for (const item of labelMap) {
+    const keyPattern = item.keys.join('|');
+    const regex = new RegExp(`(?:^|\\n)\\s*(?:${keyPattern})\\s*[：:]\\s*([\\s\\S]*?)(?=\\n\\s*(?:${allKeys})\\s*[：:]|$)`, 'i');
+    const matched = text.match(regex);
+    if (matched && matched[1]) {
+      decision[item.field] = matched[1].trim();
+    }
+  }
+
+  if (!decision.conclusion) {
+    const firstLine = text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || '';
+    decision.conclusion = firstLine || '暂无结论';
+  }
+  if (!decision.evidence) {
+    decision.evidence = text;
+  }
+  if (!decision.action) {
+    decision.action = '建议继续跟踪负面增速最高的来源与关键词，并做日度复盘。';
+  }
+  if (!decision.risk) {
+    decision.risk = '中';
+  }
+  if (!decision.confidence) {
+    decision.confidence = '中';
+  }
+  return decision;
+}
+
 async function sendQaInput() {
   const text = qaInput.value.trim();
   if (!text || qaLoading.value) return;
+  qaQuestion.value = text;
   qaInput.value = '';
   qaLoading.value = true;
   qaCaveLines.value = [`你：${text}`, '答：思考中...'];
+  qaDecision.value = {
+    conclusion: '正在生成结论...',
+    evidence: '正在整理证据...',
+    action: '正在生成建议动作...',
+    risk: '评估中',
+    confidence: '评估中'
+  };
+  qaTraceSql.value = '';
+  qaTimeRange.value = '';
   try {
     if (!window.terminalHelper || typeof window.terminalHelper.askQa !== 'function') {
       throw new Error('问答接口不可用');
@@ -625,10 +701,23 @@ async function sendQaInput() {
     if (!result || !result.ok) {
       throw new Error((result && result.error) || '问答失败');
     }
-    qaCaveLines.value = [`你：${text}`, `答：${result.answer || '（空回复）'}`];
+    const answer = result.answer || '（空回复）';
+    qaCaveLines.value = [`你：${text}`, `答：${answer}`];
+    qaDecision.value = parseQaDecision(answer);
+    qaTraceSql.value = typeof result.sql === 'string' ? result.sql : '';
+    qaTimeRange.value = typeof result.timeRange === 'string' ? result.timeRange : '';
   } catch (error) {
     const message = error && error.message ? error.message : '问答失败';
     qaCaveLines.value = [`你：${text}`, `答：${message}`];
+    qaDecision.value = {
+      conclusion: message,
+      evidence: '本次调用失败，未返回可用证据。',
+      action: '请检查 API Key、网络连接和数据库连接后重试。',
+      risk: '高',
+      confidence: '低'
+    };
+    qaTraceSql.value = '';
+    qaTimeRange.value = '';
     showToast(message, 'error');
   } finally {
     qaLoading.value = false;

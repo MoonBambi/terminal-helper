@@ -1,4 +1,4 @@
-﻿const { ipcMain, dialog, BrowserWindow, app } = require('electron');
+const { ipcMain, dialog, BrowserWindow, app } = require('electron');
 const { spawn, spawnSync } = require('child_process');
 const pty = require('node-pty');
 const fs = require('fs');
@@ -85,16 +85,30 @@ Rules:
 - Generate exactly one MySQL SELECT statement.
 - Never generate UPDATE, DELETE, INSERT, DROP, ALTER, TRUNCATE, CREATE, REPLACE.
 - Only query the two tables above.
-- If user request is unrelated to these tables, return exactly this sentence:
+- For personal/decision questions (e.g. "我今年该怎么做"), DO NOT reject directly.
+  Convert the question into a data-supported query from the two tables, focusing on:
+  recent sentiment trend, high-risk sources, high-frequency keywords, or latest negative news.
+- Only when the question is completely impossible to map to the dataset, return exactly:
 老牛在田里转了一圈，没发现相关数据。
 - Output either SQL code block or the fixed sentence above. No extra explanation.`;
 
 const QWEN_SUMMARY_SYSTEM_PROMPT = `You are DumbOx data analyst.
-Given user question + executed SQL + SQL result rows, provide concise Chinese summary:
-- First line: direct conclusion.
-- Then 1-3 key observations.
+Given user question + executed SQL + SQL result rows, provide concise Chinese decision output.
+You must answer in Chinese and strictly follow this template:
+结论：...
+证据：...
+建议动作：...
+风险等级：高/中/低
+置信度：高/中/低
+
+Requirements:
+- Support management questions such as:
+  1) 本周最需要关注的3个风险点是什么
+  2) 哪些来源的负面增长最快
+  3) 如果只做一件事，优先处理哪个主题
+- Keep answer concrete and actionable.
 - Do not fabricate numbers.
-- If result set is empty, clearly say: 未查到匹配数据。`;
+- If result set is empty, still output the same five fields and explain no matched data.`;
 
 const QWEN_NO_DATA_TEXT = '老牛在田里转了一圈，没发现相关数据。';
 const ALLOWED_QUERY_TABLES = new Set(['word_frequency_stats', 'land_news_analysis']);
@@ -118,13 +132,16 @@ function extractSqlFromModelText(text) {
 function validateSelectSql(sql) {
   const original = String(sql || '').trim();
   if (!original) return { ok: false, error: '未生成 SQL' };
-  if (/--|\/\*/.test(original)) return { ok: false, error: 'SQL 包含注释，已拒绝执行' };
-  const semicolonCount = (original.match(/;/g) || []).length;
-  if (semicolonCount > 1 || (semicolonCount === 1 && !/;\s*$/.test(original))) {
-    return { ok: false, error: '仅允许单条 SQL' };
-  }
-
-  const normalized = original.replace(/;+\s*$/, '').trim();
+  const statements = original
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!statements.length) return { ok: false, error: '未生成 SQL' };
+  const firstStatement = statements[0];
+  const firstSelect = statements.find((item) => /^select\b/i.test(item));
+  const normalized = (/^select\b/i.test(firstStatement) ? firstStatement : firstSelect || '').trim();
+  if (!normalized) return { ok: false, error: '仅允许 SELECT 查询' };
+  if (/--|\/\*/.test(normalized)) return { ok: false, error: 'SQL 包含注释，已拒绝执行' };
   if (!/^select\b/i.test(normalized)) return { ok: false, error: '仅允许 SELECT 查询' };
   if (/\b(update|delete|insert|drop|alter|truncate|create|replace|grant|revoke)\b/i.test(normalized)) {
     return { ok: false, error: 'SQL 包含危险关键字，已拒绝执行' };
@@ -158,6 +175,89 @@ function attachDefaultLimit(sql, limit = 200) {
   return `${sql}\nLIMIT ${limit}`;
 }
 
+function wantsFullRange(question) {
+  const text = String(question || '').trim();
+  if (!text) return false;
+  return /全量|全部|所有|不限时间|历史全部|历年|全部时间|全时期|全时段|所有年份/.test(text);
+}
+
+function hasExplicitDateFilter(sql) {
+  const text = String(sql || '').toLowerCase();
+  if (!text) return false;
+  if (/date_sub\s*\(|curdate\s*\(|now\s*\(|\byear\s*\(/.test(text)) return true;
+  return /\b(publish_date|created_at)\b[\s\S]{0,30}(>=|<=|>|<|=|between)/i.test(text);
+}
+
+function extractYearRangeFromQuestion(question) {
+  const text = String(question || '');
+  if (!text) return null;
+  const matches = [...text.matchAll(/\b(20\d{2})\b/g)];
+  const years = matches
+    .map((item) => Number(item[1]))
+    .filter((year) => Number.isFinite(year) && year >= 2000 && year <= 2099);
+  if (!years.length) return null;
+  const startYear = Math.min(...years);
+  const endYear = Math.max(...years);
+  return { startYear, endYear };
+}
+
+function resolveNewsTableAlias(sql) {
+  const sourceSql = String(sql || '');
+  const match = sourceSql.match(/\bfrom\s+land_news_analysis(?:\s+as)?\s+([a-zA-Z_][\w]*)/i);
+  if (!match || !match[1]) return 'land_news_analysis';
+  const alias = match[1];
+  const lower = alias.toLowerCase();
+  const reserved = new Set(['where', 'group', 'order', 'limit', 'join', 'left', 'right', 'inner', 'outer', 'on']);
+  return reserved.has(lower) ? 'land_news_analysis' : alias;
+}
+
+function injectNewsDateExpr(sourceSql, dateExpr) {
+  const tailMatch = sourceSql.match(/\b(group\s+by|order\s+by|limit)\b/i);
+  if (!tailMatch) {
+    if (/\bwhere\b/i.test(sourceSql)) {
+      return `${sourceSql} AND ${dateExpr}`;
+    }
+    return `${sourceSql} WHERE ${dateExpr}`;
+  }
+
+  const tailIndex = tailMatch.index;
+  const head = sourceSql.slice(0, tailIndex).trimEnd();
+  const tail = sourceSql.slice(tailIndex);
+  if (/\bwhere\b/i.test(head)) {
+    return `${head} AND ${dateExpr} ${tail}`;
+  }
+  return `${head} WHERE ${dateExpr} ${tail}`;
+}
+
+function enforceRecentYearForNewsSql(sql, question) {
+  const sourceSql = String(sql || '').trim();
+  if (!sourceSql) return { sql: sourceSql, enforced: false, label: '' };
+  if (wantsFullRange(question)) return { sql: sourceSql, enforced: false, label: '' };
+  if (!/\bland_news_analysis\b/i.test(sourceSql)) return { sql: sourceSql, enforced: false, label: '' };
+  if (hasExplicitDateFilter(sourceSql)) return { sql: sourceSql, enforced: false, label: '' };
+
+  const alias = resolveNewsTableAlias(sourceSql);
+  const yearRange = extractYearRangeFromQuestion(question);
+  if (yearRange) {
+    const { startYear, endYear } = yearRange;
+    const dateExpr =
+      `${alias}.publish_date >= '${startYear}-01-01' AND ` +
+      `${alias}.publish_date < '${endYear + 1}-01-01'`;
+    return {
+      sql: injectNewsDateExpr(sourceSql, dateExpr),
+      enforced: true,
+      label: `${startYear}~${endYear}年（按提问）`
+    };
+  }
+
+  const dateExpr = `${alias}.publish_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)`;
+  return {
+    sql: injectNewsDateExpr(sourceSql, dateExpr),
+    enforced: true,
+    label: '近1年（默认）'
+  };
+}
+
 function stringifyRowsForPrompt(rows, maxRows = 120, maxChars = 30000) {
   const clippedRows = Array.isArray(rows) ? rows.slice(0, maxRows) : [];
   let text = JSON.stringify(clippedRows, null, 2);
@@ -165,6 +265,27 @@ function stringifyRowsForPrompt(rows, maxRows = 120, maxChars = 30000) {
     text = `${text.slice(0, maxChars)}\n...(truncated)`;
   }
   return text;
+}
+
+function inferTimeRangeFromRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return '查询结果为空，无法推断时间范围';
+  }
+  const values = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const raw = row.publish_date || row.created_at || row.date || row.day || row.month;
+    if (raw === undefined || raw === null) continue;
+    const text = String(raw).trim();
+    if (text) values.push(text.slice(0, 19));
+  }
+  if (!values.length) {
+    return '结果未包含时间字段（可能为全量范围）';
+  }
+  values.sort();
+  const start = values[0];
+  const end = values[values.length - 1];
+  return start === end ? start : `${start} ~ ${end}`;
 }
 
 function detectShellPaths() {
@@ -623,11 +744,16 @@ function registerIpcHandlers() {
         return { ok: false, error: `SQL 校验失败：${sqlCheck.error}` };
       }
 
-      const executableSql = attachDefaultLimit(sqlCheck.sql);
+      const withRangeGuard = enforceRecentYearForNewsSql(sqlCheck.sql, question);
+      const executableSql = attachDefaultLimit(withRangeGuard.sql);
       const pool = getBoardDbPool();
       const [rows] = await pool.query(executableSql);
       const rowCount = Array.isArray(rows) ? rows.length : 0;
       const rowsText = stringifyRowsForPrompt(rows);
+      let timeRange = inferTimeRangeFromRows(rows);
+      if (withRangeGuard.enforced && /未包含时间字段|查询结果为空/.test(timeRange)) {
+        timeRange = withRangeGuard.label || '近1年（默认）';
+      }
 
       const summaryCompletion = await client.chat.completions.create({
         model,
@@ -649,7 +775,8 @@ function registerIpcHandlers() {
         ok: true,
         answer: answer || (rowCount ? '查询完成，但模型未返回总结文本。' : '未查到匹配数据。'),
         sql: executableSql,
-        rowCount
+        rowCount,
+        timeRange
       };
     } catch (error) {
       const message = error && error.message ? error.message : '问答请求失败';
